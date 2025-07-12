@@ -56,6 +56,7 @@ class FileService {
   async loadDocument(): Promise<DocumentData> {
     try {
       console.log('loadDocument called, showing open dialog...');
+      
       // Show open dialog
       const filePath = await open({
         filters: [{
@@ -67,14 +68,20 @@ class FileService {
       
       console.log('Open dialog result:', filePath);
       
+      if (filePath === null) {
+        throw new Error('File selection was cancelled by user');
+      }
+      
       if (!filePath || Array.isArray(filePath)) {
         throw new Error('No file selected or invalid selection');
       }
 
+      console.log('Invoking load_document command with path:', filePath);
       const result = await invoke<DocumentData>('load_document', { 
         path: filePath 
       });
       
+      console.log('Backend returned result:', result);
       return result;
     } catch (error) {
       console.error('Load error:', error);

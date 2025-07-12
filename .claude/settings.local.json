@@ -13,7 +13,16 @@
       "Bash(mkdir:*)",
       "mcp__ide__getDiagnostics",
       "Bash(npm run dev)",
-      "Bash(npm --prefix /Users/jordannakamoto/start/cognitive-canvas run tauri dev)"
+      "Bash(npm --prefix /Users/jordannakamoto/start/cognitive-canvas run tauri dev)",
+      "Bash(npm uninstall:*)",
+      "Bash(npx tsc:*)",
+      "Bash(find:*)",
+      "Bash(npm run build:*)",
+      "Bash(ls:*)",
+      "Bash(npm run check:*)",
+      "Bash(npm run:*)",
+      "Bash(mv:*)",
+      "Bash(curl:*)"
     ],
     "deny": []
   }

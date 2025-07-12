@@ -27,5 +27,6 @@
     "noFallthroughCasesInSwitch": true
   },
   "include": ["src"],
+  "exclude": ["src/App.broken.tsx"],
   "references": [{ "path": "./tsconfig.node.json" }]
 }

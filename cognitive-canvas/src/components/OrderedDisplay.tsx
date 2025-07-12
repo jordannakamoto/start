@@ -1,0 +1,286 @@
+// Ordered Display Component - Uses the First Draw system
+// Renders: Panels → Tabs → Content in proper order
+
+import { useEffect, useState } from 'react';
+import {
+  Panel,
+  PanelGroup,
+  PanelResizeHandle,
+} from "react-resizable-panels";
+
+import { firstDrawCoordinator } from '@/display/FirstDrawCoordinator';
+import { PanelRenderer } from '@/display/steps/01_PanelRenderer';
+import { TabRenderer } from '@/display/steps/02_TabRenderer';
+import { ContentRenderer } from '@/display/steps/03_ContentRenderer';
+
+// Import all render steps to ensure they're registered
+import '@/display/steps/01_PanelRenderer';
+import '@/display/steps/02_TabRenderer';
+import '@/display/steps/03_ContentRenderer';
+
+// Simple tab component
+function TabButton({ title, isActive, onActivate, onClose }: {
+  title: string;
+  isActive: boolean;
+  onActivate: () => void;
+  onClose: () => void;
+}) {
+  return (
+    <div 
+      onClick={onActivate}
+      className={`px-3 py-2 text-sm border-r cursor-pointer flex items-center gap-2 ${
+        isActive ? 'bg-blue-100 border-blue-300' : 'bg-gray-50 hover:bg-gray-100'
+      }`}
+    >
+      <span className="flex-1">
+        {title}
+      </span>
+      <button 
+        onClick={(e) => { e.stopPropagation(); onClose(); }}
+        className="text-gray-400 hover:text-red-500"
+      >
+        ×
+      </button>
+    </div>
+  );
+}
+
+// Tab bar for a panel
+function PanelTabBar({ panelId }: { panelId: 'main' | 'sidebar' }) {
+  const [tabData, setTabData] = useState<any>(null);
+
+  useEffect(() => {
+    const updateTabs = () => {
+      const layout = (window as any).tabLayout;
+      if (layout && layout[panelId]) {
+        setTabData(layout[panelId]);
+      }
+    };
+
+    // Initial load
+    updateTabs();
+
+    // Listen for tab updates
+    window.addEventListener('tabs-rendered', updateTabs);
+    return () => window.removeEventListener('tabs-rendered', updateTabs);
+  }, [panelId]);
+
+  if (!tabData || tabData.tabs.length === 0) {
+    return (
+      <div className="border-b p-4 text-gray-500 text-center">
+        <button 
+          onClick={() => {
+            TabRenderer.createNewDocumentTab(panelId);
+            firstDrawCoordinator.redraw();
+          }}
+          className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+        >
+          Create Document
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="border-b">
+      <div className="flex">
+        {tabData.tabs.map((tab: any) => (
+          <TabButton
+            key={tab.id}
+            title={tab.title}
+            isActive={tab.isActive}
+            onActivate={() => {
+              TabRenderer.activateTab(panelId, tab.id);
+              firstDrawCoordinator.redraw();
+            }}
+            onClose={() => {
+              TabRenderer.removeTab(panelId, tab.id);
+              firstDrawCoordinator.redraw();
+            }}
+          />
+        ))}
+        <button 
+          onClick={() => {
+            TabRenderer.createNewDocumentTab(panelId);
+            firstDrawCoordinator.redraw();
+          }}
+          className="px-3 py-2 text-gray-400 hover:text-gray-600"
+        >
+          +
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// Content area for a panel
+function PanelContent({ panelId }: { panelId: 'main' | 'sidebar' }) {
+  const [content, setContent] = useState<any>(null);
+
+  useEffect(() => {
+    const updateContent = () => {
+      const layout = (window as any).contentLayout;
+      if (layout && layout[panelId]) {
+        setContent(layout[panelId]);
+      } else {
+        setContent(null);
+      }
+    };
+
+    // Initial load
+    updateContent();
+
+    // Listen for content updates
+    window.addEventListener('content-rendered', updateContent);
+    return () => window.removeEventListener('content-rendered', updateContent);
+  }, [panelId]);
+
+  if (!content) {
+    return (
+      <div className="flex-1 flex items-center justify-center text-gray-500">
+        No document selected
+      </div>
+    );
+  }
+
+  // Immediate updates - web worker handles persistence asynchronously
+  const handleTitleChange = (newTitle: string) => {
+    ContentRenderer.updateDocumentTitle(content.documentId, newTitle);
+    firstDrawCoordinator.redraw();
+  };
+
+  const handleContentChange = (newContent: string) => {
+    ContentRenderer.updateDocumentContent(content.documentId, newContent);
+    firstDrawCoordinator.redraw();
+  };
+
+  return (
+    <div className="flex-1 flex flex-col">
+      <div className="p-4 border-b">
+        <input
+          type="text"
+          value={content.title}
+          onChange={(e) => handleTitleChange(e.target.value)}
+          className="text-lg font-semibold w-full border-none outline-none"
+          placeholder="Document title..."
+        />
+      </div>
+      <div className="flex-1 p-4">
+        <textarea
+          value={content.content}
+          onChange={(e) => handleContentChange(e.target.value)}
+          className="w-full h-full border-none outline-none resize-none"
+          placeholder="Start typing..."
+        />
+      </div>
+    </div>
+  );
+}
+
+// Main panel component
+function DisplayPanel({ panelId }: { panelId: 'main' | 'sidebar' }) {
+  return (
+    <div className="h-full flex flex-col bg-white">
+      <PanelTabBar panelId={panelId} />
+      <PanelContent panelId={panelId} />
+    </div>
+  );
+}
+
+// Main ordered display component
+export function OrderedDisplay() {
+  const [panelLayout, setPanelLayout] = useState<any>(null);
+  const [isReady, setIsReady] = useState(false);
+
+  // Execute first draw on mount
+  useEffect(() => {
+    const executeFirstDraw = async () => {
+      await firstDrawCoordinator.executeFirstDraw();
+      setIsReady(true);
+    };
+
+    executeFirstDraw();
+  }, []);
+
+  // Listen for panel layout changes
+  useEffect(() => {
+    const updatePanels = () => {
+      const layout = (window as any).panelLayout;
+      if (layout) {
+        setPanelLayout(layout);
+      }
+    };
+
+    // Initial load
+    updatePanels();
+
+    // Listen for panel updates
+    window.addEventListener('panels-rendered', updatePanels);
+    return () => window.removeEventListener('panels-rendered', updatePanels);
+  }, []);
+
+  // Handle panel resize
+  const handlePanelResize = (sizes: number[]) => {
+    if (sizes.length >= 2) {
+      PanelRenderer.updatePanelWidth('main', sizes[0]);
+      PanelRenderer.updatePanelWidth('sidebar', sizes[1]);
+    }
+  };
+
+  if (!isReady || !panelLayout) {
+    return (
+      <div className="h-screen bg-white flex items-center justify-center">
+        <div className="text-gray-600">Initializing display...</div>
+      </div>
+    );
+  }
+
+  const visiblePanels = Object.entries(panelLayout)
+    .filter(([_, panel]: [string, any]) => panel.visible)
+    .map(([id, panel]: [string, any]) => ({ id, ...panel }));
+
+  if (visiblePanels.length === 0) {
+    return (
+      <div className="h-screen bg-white flex items-center justify-center">
+        <div className="text-gray-500">No panels visible</div>
+      </div>
+    );
+  }
+
+  // Single panel
+  if (visiblePanels.length === 1) {
+    const panel = visiblePanels[0];
+    return (
+      <div className="h-screen">
+        <DisplayPanel panelId={panel.id as 'main' | 'sidebar'} />
+      </div>
+    );
+  }
+
+  // Multi-panel layout
+  return (
+    <div className="h-screen bg-white">
+      <PanelGroup 
+        direction="horizontal" 
+        className="h-full"
+        onLayout={handlePanelResize}
+      >
+        <Panel 
+          defaultSize={panelLayout.main.width} 
+          minSize={20}
+        >
+          <DisplayPanel panelId="main" />
+        </Panel>
+        
+        <PanelResizeHandle className="w-2 bg-gray-200 hover:bg-gray-300 transition-colors" />
+        
+        <Panel 
+          defaultSize={panelLayout.sidebar.width} 
+          minSize={15}
+        >
+          <DisplayPanel panelId="sidebar" />
+        </Panel>
+      </PanelGroup>
+    </div>
+  );
+}
