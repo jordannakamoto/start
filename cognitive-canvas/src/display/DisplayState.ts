@@ -17,6 +17,7 @@ export interface DocumentState {
   id: string;
   title: string;
   content: string;
+  contentType: 'lexical' | 'canvas';
   lastModified: number;
 }
 
@@ -141,6 +142,7 @@ class DisplayStateContainer {
       id: docId, 
       title: 'Untitled',
       content: '',
+      contentType: 'lexical' as const,
       lastModified: Date.now(),
       ...initialDoc
     };

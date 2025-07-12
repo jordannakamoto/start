@@ -65,6 +65,12 @@ export class ContentRenderer {
     displayState.updateDocument(documentId, { title });
   }
 
+  // Update document content type
+  static updateDocumentContentType(documentId: string, contentType: 'lexical' | 'canvas'): void {
+    console.log(`📄 Updating content type for document: ${documentId} to "${contentType}"`);
+    displayState.updateDocument(documentId, { contentType });
+  }
+
   // Get active content for a panel
   static getActiveContentForPanel(panelId: 'main' | 'sidebar') {
     const state = displayState.getState();

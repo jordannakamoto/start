@@ -11,7 +11,8 @@ import {
 import { firstDrawCoordinator } from '@/display/FirstDrawCoordinator';
 import { PanelRenderer } from '@/display/steps/01_PanelRenderer';
 import { TabRenderer } from '@/display/steps/02_TabRenderer';
-import { ContentRenderer } from '@/display/steps/03_ContentRenderer';
+import { ContentRenderer as ContentRendererStep } from '@/display/steps/03_ContentRenderer';
+import { ContentRenderer } from '@/content/ContentRenderer';
 
 // Import all render steps to ensure they're registered
 import '@/display/steps/01_PanelRenderer';
@@ -145,14 +146,15 @@ function PanelContent({ panelId }: { panelId: 'main' | 'sidebar' }) {
 
   // Immediate updates - web worker handles persistence asynchronously
   const handleTitleChange = (newTitle: string) => {
-    ContentRenderer.updateDocumentTitle(content.documentId, newTitle);
+    ContentRendererStep.updateDocumentTitle(content.documentId, newTitle);
     firstDrawCoordinator.redraw();
   };
 
   const handleContentChange = (newContent: string) => {
-    ContentRenderer.updateDocumentContent(content.documentId, newContent);
+    ContentRendererStep.updateDocumentContent(content.documentId, newContent);
     firstDrawCoordinator.redraw();
   };
+
 
   return (
     <div className="flex-1 flex flex-col">
@@ -165,12 +167,18 @@ function PanelContent({ panelId }: { panelId: 'main' | 'sidebar' }) {
           placeholder="Document title..."
         />
       </div>
-      <div className="flex-1 p-4">
-        <textarea
-          value={content.content}
-          onChange={(e) => handleContentChange(e.target.value)}
-          className="w-full h-full border-none outline-none resize-none"
-          placeholder="Start typing..."
+      <div className="flex-1">
+        <ContentRenderer
+          document={{
+            id: content.documentId,
+            title: content.title,
+            content: content.content,
+            contentType: content.contentType || 'lexical',
+            lastModified: content.lastModified || Date.now()
+          }}
+          onContentChange={handleContentChange}
+          onTitleChange={handleTitleChange}
+          isActive={true}
         />
       </div>
     </div>
