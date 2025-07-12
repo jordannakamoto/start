@@ -10,6 +10,12 @@ import { OnChangePlugin } from '@lexical/react/LexicalOnChangePlugin';
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext';
 import { LexicalErrorBoundary } from '@lexical/react/LexicalErrorBoundary';
 import { RichTextPlugin } from '@lexical/react/LexicalRichTextPlugin';
+import { ListPlugin } from '@lexical/react/LexicalListPlugin';
+import { CheckListPlugin } from '@lexical/react/LexicalCheckListPlugin';
+import { HeadingNode, QuoteNode } from '@lexical/rich-text';
+import { ListItemNode, ListNode } from '@lexical/list';
+import { CodeHighlightNode, CodeNode } from '@lexical/code';
+import { AutoLinkNode, LinkNode } from '@lexical/link';
 import { ToolbarPlugin } from './ToolbarPlugin';
 
 import { ContentTypeDefinition, ContentEditorProps } from '../types';
@@ -33,14 +39,44 @@ function createEditorConfig(initialContent: string, documentId: string) {
 
   return {
     namespace: `CognitiveCanvas-${documentId}`, // Unique namespace per document
+    nodes: [
+      HeadingNode,
+      ListNode,
+      ListItemNode,
+      QuoteNode,
+      CodeNode,
+      CodeHighlightNode,
+      AutoLinkNode,
+      LinkNode,
+    ],
     theme: {
       root: 'p-4 border-none outline-none min-h-full',
-      paragraph: 'mb-2',
+      paragraph: 'mb-3',
+      heading: {
+        h1: 'text-3xl font-bold mb-4 mt-6',
+        h2: 'text-2xl font-bold mb-3 mt-5',
+        h3: 'text-xl font-bold mb-2 mt-4',
+        h4: 'text-lg font-bold mb-2 mt-3',
+        h5: 'text-base font-bold mb-1 mt-2',
+        h6: 'text-sm font-bold mb-1 mt-2',
+      },
+      list: {
+        nested: {
+          listitem: 'ml-4',
+        },
+        ol: 'list-decimal list-inside mb-2',
+        ul: 'list-disc list-inside mb-2',
+        listitem: 'mb-1',
+      },
       text: {
         bold: 'font-bold',
         italic: 'italic',
         underline: 'underline',
+        strikethrough: 'line-through',
+        code: 'bg-gray-100 px-1 py-0.5 rounded text-sm font-mono',
       },
+      code: 'bg-gray-100 p-3 rounded font-mono text-sm block mb-2',
+      quote: 'border-l-4 border-gray-300 pl-4 italic mb-2 text-gray-600',
     },
     editorState: initialEditorState,
     onError: (error: Error) => {
@@ -110,6 +146,8 @@ function LexicalEditor({ documentId, content, onContentChange, isActive }: Conte
           
           {/* Plugins */}
           <HistoryPlugin />
+          <ListPlugin />
+          <CheckListPlugin />
           <OnChangeContentPlugin onContentChange={onContentChange} />
           <PlainTextInitPlugin content={content} />
         </div>
