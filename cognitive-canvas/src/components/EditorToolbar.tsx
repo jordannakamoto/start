@@ -7,18 +7,17 @@ import {
   FORMAT_ELEMENT_COMMAND,
   UNDO_COMMAND,
   REDO_COMMAND,
+  TextFormatType,
+  ElementFormatType,
+  $createParagraphNode,
 } from 'lexical';
 import {
   INSERT_ORDERED_LIST_COMMAND,
   INSERT_UNORDERED_LIST_COMMAND,
-  REMOVE_LIST_COMMAND,
-  $isListNode,
-  ListNode,
 } from '@lexical/list';
 import { INSERT_TABLE_COMMAND } from '@lexical/table';
-import { $createHeadingNode, $createQuoteNode, $isHeadingNode } from '@lexical/rich-text';
-import { $setBlocksType } from '@lexical/selection';
-import { $createParagraphNode, $getNodeByKey } from 'lexical';
+import { $patchStyleText, $setBlocksType } from '@lexical/selection';
+import { $createHeadingNode, $createQuoteNode } from '@lexical/rich-text';
 import {
   Bold,
   Italic,
@@ -31,12 +30,9 @@ import {
   AlignJustify,
   List,
   ListOrdered,
-  Quote,
   Undo,
   Redo,
-  Type,
   Table,
-  ChevronDown,
 } from 'lucide-react';
 
 import { Toggle } from '@/components/ui/toggle';
@@ -49,7 +45,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { cn } from '@/lib/utils';
 
 const FONT_FAMILIES = [
   { name: 'Inter', value: 'Inter, sans-serif' },
@@ -122,7 +117,7 @@ export function EditorToolbar() {
     });
   }, [editor, updateToolbar]);
 
-  const formatText = (format: string) => {
+  const formatText = (format: TextFormatType) => {
     editor.dispatchCommand(FORMAT_TEXT_COMMAND, format);
   };
 
@@ -130,7 +125,7 @@ export function EditorToolbar() {
     editor.update(() => {
       const selection = $getSelection();
       if ($isRangeSelection(selection)) {
-        selection.formatText('font-family', fontFamily);
+        $patchStyleText(selection, { 'font-family': fontFamily });
       }
     });
   };
@@ -139,12 +134,12 @@ export function EditorToolbar() {
     editor.update(() => {
       const selection = $getSelection();
       if ($isRangeSelection(selection)) {
-        selection.formatText('font-size', fontSize);
+        $patchStyleText(selection, { 'font-size': fontSize });
       }
     });
   };
 
-  const formatElement = (alignment: string) => {
+  const formatElement = (alignment: ElementFormatType) => {
     editor.dispatchCommand(FORMAT_ELEMENT_COMMAND, alignment);
   };
 

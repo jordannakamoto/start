@@ -26,11 +26,6 @@ const EditorCore = React.lazy(() =>
   }))
 );
 
-const Settings = React.lazy(() => 
-  import('../features/settings/Settings').then(module => ({
-    default: module.Settings
-  }))
-);
 
 // Loading fallback optimized for minimal render cost
 const LoadingFallback: React.FC<{ message?: string }> = ({ message = 'Loading...' }) => (
@@ -178,10 +173,7 @@ export const App: React.FC = () => {
         </div>
 
         {/* Settings Modal */}
-        <Suspense fallback={null}>
-          <SettingsManager />
-        </Suspense>
-      </ErrorBoundary>
+              </ErrorBoundary>
 
       {/* Performance HUD (development only) */}
       {process.env.NODE_ENV === 'development' && (
@@ -214,12 +206,6 @@ const MainEditor: React.FC = () => {
   );
 };
 
-// Settings management component
-const SettingsManager: React.FC = () => {
-  // Implementation would handle settings modal state
-  // For now, return null as placeholder
-  return null;
-};
 
 // Development performance HUD
 const PerformanceHUD: React.FC = () => {

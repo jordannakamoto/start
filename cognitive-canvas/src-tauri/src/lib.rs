@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 use std::path::Path;
 
 mod settings_manager;
+mod shortcuts_manager;
 mod config_parser;
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -132,6 +133,11 @@ fn set_window_fullscreen(app_handle: tauri::AppHandle, fullscreen: bool) -> Resu
 }
 
 #[tauri::command]
+fn get_shortcuts(app_handle: tauri::AppHandle) -> Result<shortcuts_manager::Shortcuts, String> {
+    shortcuts_manager::load_shortcuts(&app_handle)
+}
+
+#[tauri::command]
 fn get_config_file_path(app_handle: tauri::AppHandle) -> Result<String, String> {
     use tauri::Manager;
     
@@ -168,6 +174,7 @@ pub fn run() {
             save_document, 
             load_document,
             get_settings,
+            get_shortcuts,
             set_window_decorations,
             set_window_maximized,
             set_window_fullscreen,

@@ -58,7 +58,14 @@ export class PerformanceMonitor {
         const entries = list.getEntries();
         entries.forEach((entry) => {
           if (entry.entryType === 'measure' && entry.name === 'frame') {
-            this.recordFrameTime(entry.duration);
+            this.addMetrics({
+              frameTime: entry.duration,
+              inputLatency: this.getAverageInputLatency(),
+              commandLatency: this.getAverageCommandLatency(),
+              renderLatency: this.getAverageRenderLatency(),
+              memoryUsage: this.getMemoryUsage(),
+              timestamp: performance.now()
+            });
           }
         });
       });

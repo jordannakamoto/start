@@ -34,10 +34,10 @@ export interface CursorPosition {
 
 export class InputProcessor {
   private handlers: InputHandler[] = [];
-  private isCapturing = false;
   private lastInputTime = 0;
   private inputBuffer: InputEvent[] = [];
   private readonly maxBufferSize = 100;
+  
   
   // Performance tracking
   private inputLatency: number[] = [];
@@ -178,14 +178,6 @@ export class InputProcessor {
     if (index !== -1) {
       this.handlers.splice(index, 1);
     }
-  }
-
-  public startCapture(): void {
-    this.isCapturing = true;
-  }
-
-  public stopCapture(): void {
-    this.isCapturing = false;
   }
 
   public getInputBuffer(): InputEvent[] {

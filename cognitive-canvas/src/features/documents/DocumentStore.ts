@@ -6,7 +6,6 @@
 
 import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
-import { CommandProcessor, CommandTypes, createOptimisticTextInsert } from '../../core/command/CommandProcessor';
 
 export interface Document {
   id: string;
@@ -376,7 +375,7 @@ export const useDocumentStore = create<DocumentStore>()(
     },
     
     resetMetrics: () => {
-      set(state => ({
+      set(() => ({
         lastUpdateTime: performance.now(),
         updateCount: 0
       }));

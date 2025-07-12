@@ -7,7 +7,7 @@
 import React, { useCallback, useMemo } from 'react';
 import { X, Plus, MoreHorizontal } from 'lucide-react';
 import { useDocumentStore, useDocumentOrder, useDocument } from '../documents/DocumentStore';
-import { getCommandProcessor, CommandTypes } from '../../core/command/CommandProcessor';
+import { getCommandProcessor } from '../../core/command/CommandProcessor';
 
 interface WorkspaceManagerProps {
   className?: string;
@@ -48,11 +48,6 @@ export const WorkspaceManager: React.FC<WorkspaceManagerProps> = ({ className = 
     if (!document) return;
 
     // Store document state for potential undo
-    const documentState = {
-      document,
-      content: useDocumentStore.getState().getDocumentContent(documentId),
-      view: useDocumentStore.getState().getDocumentView(documentId)
-    };
 
     commandProcessor.execute({
       type: 'document.close',

@@ -1,16 +1,18 @@
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext';
 import { useCallback, useEffect, useState } from 'react';
-import { $getSelection, $isRangeSelection } from 'lexical';
+import {
+  $getSelection,
+  $isRangeSelection,
+} from 'lexical';
 import {
   $deleteTableColumn__EXPERIMENTAL,
   $deleteTableRow__EXPERIMENTAL,
   $getTableCellNodeFromLexicalNode,
-  $getTableColumnIndexFromTableCellNode,
   $getTableNodeFromLexicalNodeOrThrow,
-  $getTableRowIndexFromTableCellNode,
   $insertTableColumn__EXPERIMENTAL,
   $insertTableRow__EXPERIMENTAL,
   $isTableCellNode,
+  TableCellNode,
 } from '@lexical/table';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
@@ -25,16 +27,19 @@ import {
 export function TableToolbar() {
   const [editor] = useLexicalComposerContext();
   const [isTableSelected, setIsTableSelected] = useState(false);
-  const [tableCellNode, setTableCellNode] = useState(null);
+  const [tableCellNode, setTableCellNode] = useState<TableCellNode | null>(null);
 
   const updateToolbar = useCallback(() => {
     const selection = $getSelection();
     if ($isRangeSelection(selection)) {
       const anchorNode = selection.anchor.getNode();
+      const parentNode = anchorNode.getParent();
+
       let cellNode = $getTableCellNodeFromLexicalNode(anchorNode);
-      if (cellNode === null) {
-        cellNode = $getTableCellNodeFromLexicalNode(anchorNode.getParent());
+      if (cellNode === null && parentNode) {
+        cellNode = $getTableCellNodeFromLexicalNode(parentNode);
       }
+      
       if ($isTableCellNode(cellNode)) {
         setIsTableSelected(true);
         setTableCellNode(cellNode);
@@ -56,8 +61,7 @@ export function TableToolbar() {
   const insertTableRowAbove = () => {
     editor.update(() => {
       if (tableCellNode) {
-        const tableRowIndex = $getTableRowIndexFromTableCellNode(tableCellNode);
-        $insertTableRow__EXPERIMENTAL(tableRowIndex);
+        $insertTableRow__EXPERIMENTAL();
       }
     });
   };
@@ -65,8 +69,7 @@ export function TableToolbar() {
   const insertTableRowBelow = () => {
     editor.update(() => {
       if (tableCellNode) {
-        const tableRowIndex = $getTableRowIndexFromTableCellNode(tableCellNode);
-        $insertTableRow__EXPERIMENTAL(tableRowIndex + 1);
+        $insertTableRow__EXPERIMENTAL(true);
       }
     });
   };
@@ -74,8 +77,7 @@ export function TableToolbar() {
   const insertTableColumnBefore = () => {
     editor.update(() => {
       if (tableCellNode) {
-        const tableColumnIndex = $getTableColumnIndexFromTableCellNode(tableCellNode);
-        $insertTableColumn__EXPERIMENTAL(tableColumnIndex);
+        $insertTableColumn__EXPERIMENTAL();
       }
     });
   };
@@ -83,8 +85,7 @@ export function TableToolbar() {
   const insertTableColumnAfter = () => {
     editor.update(() => {
       if (tableCellNode) {
-        const tableColumnIndex = $getTableColumnIndexFromTableCellNode(tableCellNode);
-        $insertTableColumn__EXPERIMENTAL(tableColumnIndex + 1);
+        $insertTableColumn__EXPERIMENTAL(true);
       }
     });
   };

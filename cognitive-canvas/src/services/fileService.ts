@@ -17,13 +17,18 @@ class FileService {
       if (!filePath) {
         console.log('No file path, showing save dialog...');
         // Show save dialog if no path is provided
-        filePath = await save({
+        const savePath = await save({
           filters: [{
             name: 'Canvas Files',
             extensions: ['canvas', 'txt']
           }],
           defaultPath: `${document.title}.canvas`
         });
+
+        if (savePath === null) {
+          throw new Error('Save cancelled by user');
+        }
+        filePath = savePath;
         
         console.log('Save dialog result:', filePath);
         

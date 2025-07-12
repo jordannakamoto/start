@@ -10,7 +10,7 @@ import { RichTextPlugin } from '@lexical/react/LexicalRichTextPlugin';
 import { ContentEditable } from '@lexical/react/LexicalContentEditable';
 import { HistoryPlugin } from '@lexical/react/LexicalHistoryPlugin';
 import { LexicalErrorBoundary } from '@lexical/react/LexicalErrorBoundary';
-import { EditorState, $getRoot, $getSelection } from 'lexical';
+import { EditorState } from 'lexical';
 import { HeadingNode, QuoteNode } from '@lexical/rich-text';
 import { ListNode, ListItemNode } from '@lexical/list';
 import { CodeNode } from '@lexical/code';
@@ -67,7 +67,7 @@ const editorNodes = [
 export const EditorCore: React.FC<EditorCoreProps> = React.memo(({ documentId, className = '' }) => {
   const document = useDocument(documentId);
   const documentContent = useDocumentContent(documentId);
-  const { updateDocumentContent, markDocumentDirty } = useDocumentStore();
+  const { markDocumentDirty } = useDocumentStore();
   
   const editorRef = useRef<HTMLDivElement>(null);
   const lastUpdateRef = useRef<number>(0);
@@ -125,7 +125,7 @@ export const EditorCore: React.FC<EditorCoreProps> = React.memo(({ documentId, c
         },
         description: `Update document ${documentId}`
       }
-    }).then((commandId) => {
+    }).then(() => {
       // The actual update will happen when the worker completes
       // For now, we show optimistic feedback
     }).catch((error) => {
@@ -263,8 +263,6 @@ interface StateChangePluginProps {
 }
 
 const StateChangePlugin: React.FC<StateChangePluginProps> = ({ onStateChange }) => {
-  const lastStateRef = useRef<string>('');
-  
   useEffect(() => {
     // Implementation would use Lexical's registerUpdateListener
     // with optimizations for the 8ms rule

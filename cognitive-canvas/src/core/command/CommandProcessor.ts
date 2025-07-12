@@ -101,7 +101,7 @@ export class CommandProcessor {
       }
       
       // Schedule next processing cycle
-      requestIdleCallback(process, { timeout: 16 }); // Ensure sub-frame processing
+      setTimeout(process, 16); // Ensure sub-frame processing
     };
     
     process();
@@ -233,7 +233,7 @@ export class CommandProcessor {
     });
   }
 
-  private handleWorkerMessage(event: MessageEvent): void {
+  private handleWorkerMessage(): void {
     // Worker message handling is done in executeInWorker
   }
 

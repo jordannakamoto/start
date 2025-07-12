@@ -38,6 +38,14 @@ impl ConfigParser {
         Ok(())
     }
 
+    pub fn get_str(&self, key: &str) -> Option<&String> {
+        self.get(key)
+    }
+
+    pub fn set_str(&mut self, key: &str, value: &str) {
+        self.set(key, value);
+    }
+
     pub fn get(&self, key: &str) -> Option<&String> {
         self.data.get(key)
     }
@@ -145,6 +153,9 @@ impl ConfigParser {
         
         self.set_bool("window_fullscreen", false);
         self.set_comment("window_fullscreen", "Start window in fullscreen mode (overrides maximized)");
+
+        self.set("command_palette", "Cmd+P");
+        self.set_comment("command_palette", "Open the command palette");
 
         self.save()?;
         Ok(())

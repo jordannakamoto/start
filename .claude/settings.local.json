@@ -10,7 +10,10 @@
       "Bash(npm run tauri:*)",
       "Bash(pkill:*)",
       "Bash(true)",
-      "Bash(mkdir:*)"
+      "Bash(mkdir:*)",
+      "mcp__ide__getDiagnostics",
+      "Bash(npm run dev)",
+      "Bash(npm --prefix /Users/jordannakamoto/start/cognitive-canvas run tauri dev)"
     ],
     "deny": []
   }
