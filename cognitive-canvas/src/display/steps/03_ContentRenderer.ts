@@ -7,10 +7,13 @@ import { PanelRenderer } from './01_PanelRenderer';
 
 // Register the content rendering step
 registerDrawStep('Active Content', 3, async (context: RenderContext) => {
-  const { state } = context;
+  const { state, isFirstDraw } = context;
   const visiblePanels = PanelRenderer.getVisiblePanels();
   
-  console.log('📄 Rendering content for visible panels:', visiblePanels);
+  // Skip verbose logging during first draw for speed
+  if (!isFirstDraw) {
+    console.log('📄 Rendering content for visible panels:', visiblePanels);
+  }
 
   const contentLayout: Record<string, any> = {};
   
@@ -27,11 +30,15 @@ registerDrawStep('Active Content', 3, async (context: RenderContext) => {
         lastModified: document.lastModified
       };
       
-      console.log(`📄 ${panelId} active content:`, document.title);
+      if (!isFirstDraw) {
+        console.log(`📄 ${panelId} active content:`, document.title);
+      }
     } else {
       // No active content
       contentLayout[panelId] = null;
-      console.log(`📄 ${panelId} has no active content`);
+      if (!isFirstDraw) {
+        console.log(`📄 ${panelId} has no active content`);
+      }
     }
   }
 
@@ -96,7 +103,7 @@ export class ContentRenderer {
   static createDocument(title: string = 'Untitled', content: string = ''): string {
     const documentId = `doc_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     
-    displayState.updateDocument(documentId, {
+    displayState.createDocument(documentId, {
       title,
       content,
       lastModified: Date.now()

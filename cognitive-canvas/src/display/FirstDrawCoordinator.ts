@@ -1,7 +1,7 @@
 // First Draw Coordinator - Orchestrates the initial render sequence
 // Order: Panels → Tabs → Content
 
-import { displayState, DisplayState } from './DisplayState';
+import { DisplayState, displayState } from './DisplayState';
 
 export interface RenderContext {
   state: DisplayState;
@@ -38,19 +38,16 @@ class FirstDrawCoordinator {
     console.log(`🎨 Registered draw step: ${step.name} (order: ${step.order})`);
   }
 
-  // Execute the complete first draw sequence
+  // Execute the complete first draw sequence - optimized for speed
   async executeFirstDraw(): Promise<void> {
-    if (this.isDrawing || this.hasDrawn) {
-      console.log('🎨 First draw already executed or in progress');
-      return;
-    }
+    if (this.isDrawing || this.hasDrawn) return;
 
     this.isDrawing = true;
-    console.log('🎨 Starting first draw sequence...');
+    const startTime = performance.now();
 
     try {
-      // Load state from storage first - wait for it to complete
-      await this.waitForStateLoad();
+      // Lightning-fast synchronous state load
+      displayState.loadFromStorageSync();
 
       const context: RenderContext = {
         state: displayState.getState(),
@@ -58,19 +55,19 @@ class FirstDrawCoordinator {
         timestamp: Date.now()
       };
 
-      console.log('🎨 Executing draw steps in order:', this.drawSteps.map(s => s.name));
-
-      // Execute each draw step in order
+      // Execute all draw steps synchronously for speed
       for (const step of this.drawSteps) {
-        console.log(`🎨 Executing: ${step.name}`);
         await step.execute(context);
       }
 
       this.hasDrawn = true;
-      console.log('✅ First draw sequence completed');
-
-      // Setup auto-save after first draw
+      
+      // Async operations after render
       this.setupAutoSave();
+      this.fadeInContent();
+
+      const duration = performance.now() - startTime;
+      console.log(`⚡ First draw completed in ${duration.toFixed(1)}ms`);
 
     } catch (error) {
       console.error('❌ First draw failed:', error);
@@ -109,21 +106,13 @@ class FirstDrawCoordinator {
     });
   }
 
-  // Wait for state to load from storage
-  private async waitForStateLoad(): Promise<void> {
-    return new Promise((resolve) => {
-      // First try sync load as immediate fallback
-      displayState.loadFromStorageSync();
-      
-      // Then try async load via worker (will update state if it gets data)
-      displayState.loadFromStorage();
-      
-      // Give worker a short time to respond, then continue
-      setTimeout(() => {
-        console.log('🎨 State load completed (sync + async)');
-        resolve();
-      }, 100); // 100ms should be enough for worker to respond
-    });
+  // Fade in the content after first draw
+  private fadeInContent(): void {
+    const rootElement = document.getElementById('root');
+    if (rootElement) {
+      rootElement.style.opacity = '1';
+      console.log('✨ Content faded in');
+    }
   }
 
   // Get registered steps (for debugging)

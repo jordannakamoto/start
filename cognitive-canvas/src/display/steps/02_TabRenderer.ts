@@ -7,10 +7,13 @@ import { PanelRenderer } from './01_PanelRenderer';
 
 // Register the tab rendering step
 registerDrawStep('Tab Navigation', 2, async (context: RenderContext) => {
-  const { state } = context;
+  const { state, isFirstDraw } = context;
   const visiblePanels = PanelRenderer.getVisiblePanels();
   
-  console.log('📑 Rendering tabs for panels:', visiblePanels);
+  // Skip verbose logging during first draw for speed
+  if (!isFirstDraw) {
+    console.log('📑 Rendering tabs for panels:', visiblePanels);
+  }
 
   // Process tabs for each visible panel
   const tabLayout: Record<string, any> = {};
@@ -28,7 +31,9 @@ registerDrawStep('Tab Navigation', 2, async (context: RenderContext) => {
     };
     
     tabLayout[panelId] = tabData;
-    console.log(`📑 ${panelId} tabs:`, tabData);
+    if (!isFirstDraw) {
+      console.log(`📑 ${panelId} tabs:`, tabData);
+    }
   }
 
   // Store in global cache
@@ -146,14 +151,14 @@ export class TabRenderer {
   static createNewDocumentTab(panelId: 'main' | 'sidebar', title: string = 'Untitled'): string {
     const documentId = `doc_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     
-    // Create the document
-    displayState.updateDocument(documentId, {
+    // Create the document (sync save)
+    displayState.createDocument(documentId, {
       title,
       content: '',
       lastModified: Date.now()
     });
     
-    // Add as tab
+    // Add as tab (also sync save)
     this.addTab(panelId, documentId);
     
     console.log(`📑 Created new document tab: ${documentId}`);

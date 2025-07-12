@@ -6,7 +6,7 @@ import tailwindcss from "@tailwindcss/vite";
 const host = process.env.TAURI_DEV_HOST;
 
 // https://vite.dev/config/
-export default defineConfig(async () => ({
+export default defineConfig(() => ({
   plugins: [react(), tailwindcss()],
   resolve: {
     alias: {
@@ -14,8 +14,33 @@ export default defineConfig(async () => ({
     },
   },
 
+  // Build optimizations
+  build: {
+    // Target modern browsers for better performance
+    target: "esnext" as const,
+    // Reduce chunk size warnings
+    chunkSizeWarningLimit: 1000,
+    // Optimize for production
+    minify: "esbuild" as const,
+    // Tree shake unused code
+    rollupOptions: {
+      output: {
+        // Smaller chunks for better caching
+        manualChunks: {
+          vendor: ["react", "react-dom"],
+          ui: ["react-resizable-panels"],
+        },
+      },
+    },
+  },
+
+  // Optimize dependencies
+  optimizeDeps: {
+    include: ["react", "react-dom", "react-resizable-panels"],
+    force: true // Pre-bundle on dev start
+  },
+
   // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
-  //p
   // 1. prevent Vite from obscuring rust errors
   clearScreen: false,
   // 2. tauri expects a fixed port, fail if that port is not available

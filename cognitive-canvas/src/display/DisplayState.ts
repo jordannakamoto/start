@@ -85,34 +85,40 @@ class DisplayStateContainer {
   }
 
   // Update state (triggers re-render)
-  setState(newState: Partial<DisplayState>): void {
+  setState(newState: Partial<DisplayState>, saveMode: 'sync' | 'async' = 'async'): void {
     this.state = { ...this.state, ...newState, version: this.state.version + 1 };
     this.notifyListeners();
-    // Immediate save via web worker (non-blocking)
-    stateWorkerManager.saveState(this.state);
+    
+    if (saveMode === 'sync') {
+      // Critical events: save immediately and synchronously
+      stateWorkerManager.saveStateSync(this.state);
+    } else {
+      // Frequent events: save via web worker (non-blocking)
+      stateWorkerManager.saveState(this.state);
+    }
   }
 
-  // Update specific panel
+  // Update specific panel (sync save - critical for layout)
   updatePanel(panelId: keyof DisplayState['panels'], updates: Partial<PanelState>): void {
     this.setState({
       panels: {
         ...this.state.panels,
         [panelId]: { ...this.state.panels[panelId], ...updates }
       }
-    });
+    }, 'sync');
   }
 
-  // Update tabs for specific panel
+  // Update tabs for specific panel (sync save - critical for navigation)
   updateTabs(panelId: keyof DisplayState['tabs'], updates: Partial<TabState>): void {
     this.setState({
       tabs: {
         ...this.state.tabs,
         [panelId]: { ...this.state.tabs[panelId], ...updates }
       }
-    });
+    }, 'sync');
   }
 
-  // Update document
+  // Update document (async save - frequent during typing)
   updateDocument(docId: string, updates: Partial<Omit<DocumentState, 'id'>>): void {
     const existingDoc = this.state.documents[docId] || { 
       id: docId, 
@@ -126,12 +132,30 @@ class DisplayStateContainer {
         ...this.state.documents,
         [docId]: { ...existingDoc, ...updates, lastModified: Date.now() }
       }
-    });
+    }, 'async'); // Keep async for typing performance
   }
 
-  // Set active document
+  // Create document (sync save - critical operation)
+  createDocument(docId: string, initialDoc: Partial<Omit<DocumentState, 'id'>>): void {
+    const doc = { 
+      id: docId, 
+      title: 'Untitled',
+      content: '',
+      lastModified: Date.now(),
+      ...initialDoc
+    };
+    
+    this.setState({
+      documents: {
+        ...this.state.documents,
+        [docId]: doc
+      }
+    }, 'sync'); // Sync save for document creation
+  }
+
+  // Set active document (sync save - critical for navigation)
   setActiveDocument(docId: string | null): void {
-    this.setState({ activeDocumentId: docId });
+    this.setState({ activeDocumentId: docId }, 'sync');
   }
 
   // Subscribe to state changes

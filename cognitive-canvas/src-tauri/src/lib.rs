@@ -152,6 +152,19 @@ fn get_config_file_path(app_handle: tauri::AppHandle) -> Result<String, String> 
         .map(|s| s.to_string())
 }
 
+#[tauri::command]
+fn show_window_when_ready(app_handle: tauri::AppHandle) -> Result<(), String> {
+    use tauri::Manager;
+    
+    if let Some(window) = app_handle.get_webview_window("main") {
+        window.show().map_err(|e| e.to_string())?;
+        window.set_focus().map_err(|e| e.to_string())?;
+        println!("🚀 Window shown from Rust backend");
+    }
+    Ok(())
+}
+
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -178,7 +191,8 @@ pub fn run() {
             set_window_decorations,
             set_window_maximized,
             set_window_fullscreen,
-            get_config_file_path
+            get_config_file_path,
+            show_window_when_ready
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

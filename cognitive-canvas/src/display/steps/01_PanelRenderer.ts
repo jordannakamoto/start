@@ -6,12 +6,15 @@ import { displayState } from '../DisplayState';
 
 // Register the panel rendering step
 registerDrawStep('Panel Layout', 1, async (context: RenderContext) => {
-  const { state } = context;
+  const { state, isFirstDraw } = context;
   
-  console.log('🔲 Rendering panel layout:', {
-    main: state.panels.main,
-    sidebar: state.panels.sidebar
-  });
+  // Skip verbose logging during first draw for speed
+  if (!isFirstDraw) {
+    console.log('🔲 Rendering panel layout:', {
+      main: state.panels.main,
+      sidebar: state.panels.sidebar
+    });
+  }
 
   // Store panel layout in global cache for React components
   (window as any).panelLayout = {

@@ -28,3 +28,16 @@ serde_json = "1"
 tokio = { version = "1", features = ["fs"] }
 chrono = { version = "0.4", features = ["serde"] }
 
+# Performance optimizations
+[profile.release]
+# Maximum optimization for size and speed
+opt-level = 3
+# Link-time optimization for better performance
+lto = true
+# Code generation units for faster compilation
+codegen-units = 1
+# Panic handling for smaller binary
+panic = "abort"
+# Strip debug symbols for smaller size
+strip = true
+

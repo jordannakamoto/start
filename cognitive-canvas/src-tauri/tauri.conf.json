@@ -15,7 +15,14 @@
         "title": "cognitive-canvas",
         "width": 1920,
         "height": 1080,
-        "maximized": true
+        "maximized": true,
+        "resizable": true,
+        "fullscreen": false,
+        "decorations": true,
+        "alwaysOnTop": false,
+        "skipTaskbar": false,
+        "visible": false,
+        "backgroundColor": "#ffffff"
       }
     ],
     "security": {
