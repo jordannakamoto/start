@@ -1,7 +1,7 @@
 // Ordered Display Component - Uses the First Draw system
 // Renders: Panels → Tabs → Content in proper order
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import {
   Panel,
   PanelGroup,
@@ -19,13 +19,47 @@ import '@/display/steps/01_PanelRenderer';
 import '@/display/steps/02_TabRenderer';
 import '@/display/steps/03_ContentRenderer';
 
-// Simple tab component
-function TabButton({ title, isActive, onActivate, onClose }: {
+// Simple tab component with editable title
+function TabButton({ title, isActive, onActivate, onClose, onTitleChange }: {
   title: string;
   isActive: boolean;
   onActivate: () => void;
   onClose: () => void;
+  onTitleChange: (newTitle: string) => void;
 }) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [editValue, setEditValue] = useState(title);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (isEditing && inputRef.current) {
+      inputRef.current.focus();
+      inputRef.current.select();
+    }
+  }, [isEditing]);
+
+  const handleDoubleClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setIsEditing(true);
+    setEditValue(title);
+  };
+
+  const handleSubmit = () => {
+    if (editValue.trim() && editValue !== title) {
+      onTitleChange(editValue.trim());
+    }
+    setIsEditing(false);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleSubmit();
+    } else if (e.key === 'Escape') {
+      setEditValue(title);
+      setIsEditing(false);
+    }
+  };
+
   return (
     <div 
       onClick={onActivate}
@@ -33,9 +67,22 @@ function TabButton({ title, isActive, onActivate, onClose }: {
         isActive ? 'bg-blue-100 border-blue-300' : 'bg-gray-50 hover:bg-gray-100'
       }`}
     >
-      <span className="flex-1">
-        {title}
-      </span>
+      {isEditing ? (
+        <input
+          ref={inputRef}
+          type="text"
+          value={editValue}
+          onChange={(e) => setEditValue(e.target.value)}
+          onBlur={handleSubmit}
+          onKeyDown={handleKeyDown}
+          onClick={(e) => e.stopPropagation()}
+          className="flex-1 bg-transparent border-none outline-none text-sm"
+        />
+      ) : (
+        <span className="flex-1" onDoubleClick={handleDoubleClick}>
+          {title}
+        </span>
+      )}
       <button 
         onClick={(e) => { e.stopPropagation(); onClose(); }}
         className="text-gray-400 hover:text-red-500"
@@ -98,6 +145,10 @@ function PanelTabBar({ panelId }: { panelId: 'main' | 'sidebar' }) {
               TabRenderer.removeTab(panelId, tab.id);
               firstDrawCoordinator.redraw();
             }}
+            onTitleChange={(newTitle: string) => {
+              ContentRendererStep.updateDocumentTitle(tab.id, newTitle);
+              firstDrawCoordinator.redraw();
+            }}
           />
         ))}
         <button 
@@ -144,6 +195,14 @@ function PanelContent({ panelId }: { panelId: 'main' | 'sidebar' }) {
     );
   }
 
+  console.log('📋 PanelContent received:', {
+    documentId: content.documentId,
+    title: content.title,
+    content: content.content,
+    contentType: content.contentType,
+    rawContent: content
+  });
+
   // Immediate updates - web worker handles persistence asynchronously
   const handleTitleChange = (newTitle: string) => {
     ContentRendererStep.updateDocumentTitle(content.documentId, newTitle);
@@ -151,36 +210,45 @@ function PanelContent({ panelId }: { panelId: 'main' | 'sidebar' }) {
   };
 
   const handleContentChange = (newContent: string) => {
+    // Check if this is a content type change request from default content type
+    try {
+      const parsed = JSON.parse(newContent);
+      if (parsed.action === 'change-type') {
+        console.log('🔄 Content type change requested:', parsed.newType, 'with content:', parsed.newContent);
+        console.log('🔍 Current document before change:', content);
+        
+        // Handle content type change
+        ContentRendererStep.updateDocumentContentType(content.documentId, parsed.newType);
+        ContentRendererStep.updateDocumentContent(content.documentId, parsed.newContent);
+        
+        console.log('🔄 Triggering redraw after content type change');
+        firstDrawCoordinator.redraw();
+        return;
+      }
+    } catch {
+      // Not a JSON change request, treat as normal content
+    }
+    
     ContentRendererStep.updateDocumentContent(content.documentId, newContent);
     firstDrawCoordinator.redraw();
   };
 
 
   return (
-    <div className="flex-1 flex flex-col h-full">
-      <div className="p-4 border-b flex-shrink-0">
-        <input
-          type="text"
-          value={content.title}
-          onChange={(e) => handleTitleChange(e.target.value)}
-          className="text-lg font-semibold w-full border-none outline-none"
-          placeholder="Document title..."
-        />
-      </div>
-      <div className="flex-1 min-h-0">
-        <ContentRenderer
-          document={{
-            id: content.documentId,
-            title: content.title,
-            content: content.content,
-            contentType: content.contentType || 'lexical',
-            lastModified: content.lastModified || Date.now()
-          }}
-          onContentChange={handleContentChange}
-          onTitleChange={handleTitleChange}
-          isActive={true}
-        />
-      </div>
+    <div className="h-full flex flex-col">
+      <ContentRenderer
+        key={`${content.documentId}-${content.contentType || 'default'}`}
+        document={{
+          id: content.documentId,
+          title: content.title,
+          content: content.content,
+          contentType: content.contentType || 'default',
+          lastModified: content.lastModified || Date.now()
+        }}
+        onContentChange={handleContentChange}
+        onTitleChange={handleTitleChange}
+        isActive={true}
+      />
     </div>
   );
 }
@@ -189,8 +257,12 @@ function PanelContent({ panelId }: { panelId: 'main' | 'sidebar' }) {
 function DisplayPanel({ panelId }: { panelId: 'main' | 'sidebar' }) {
   return (
     <div className="h-full flex flex-col bg-white">
-      <PanelTabBar panelId={panelId} />
-      <PanelContent panelId={panelId} />
+      <div className="flex-shrink-0">
+        <PanelTabBar panelId={panelId} />
+      </div>
+      <div className="flex-1 min-h-0">
+        <PanelContent panelId={panelId} />
+      </div>
     </div>
   );
 }

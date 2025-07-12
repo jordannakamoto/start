@@ -3,7 +3,7 @@
 
 import { ReactElement } from 'react';
 
-export type ContentType = 'lexical' | 'canvas';
+export type ContentType = 'default' | 'lexical' | 'canvas' | 'ai-assistant';
 
 export interface ContentTypeMetadata {
   type: ContentType;
@@ -64,7 +64,7 @@ export class ContentTypeRegistry {
   }
 
   getDefaultType(): ContentType {
-    return 'lexical'; // Default to lexical for rich text
+    return 'default'; // Default to menu for new tabs
   }
 }
 

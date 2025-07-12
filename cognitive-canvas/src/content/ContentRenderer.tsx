@@ -20,13 +20,16 @@ export function ContentRenderer({
   isActive, 
   readOnly = false 
 }: ContentRendererProps) {
+  console.log('🔍 Rendering content type:', document.contentType, 'for document:', document.id);
+  console.log('🔍 Full document object:', document);
+  
   // Get the content type definition
   const contentTypeDef = contentTypeRegistry.get(document.contentType);
   
   if (!contentTypeDef) {
-    console.warn(`Unknown content type: ${document.contentType}, falling back to lexical`);
-    const lexicalContentType = contentTypeRegistry.get('lexical');
-    if (!lexicalContentType) {
+    console.warn(`❌ Unknown content type: ${document.contentType}, falling back to default`);
+    const defaultContentType = contentTypeRegistry.get('default');
+    if (!defaultContentType) {
       return (
         <div className="p-4 text-red-500 h-full overflow-y-auto">
           Error: No content type available for rendering
@@ -36,7 +39,7 @@ export function ContentRenderer({
     
     return (
       <div className="h-full">
-        {lexicalContentType.renderEditor({
+        {defaultContentType.renderEditor({
           documentId: document.id,
           content: document.content,
           onContentChange,

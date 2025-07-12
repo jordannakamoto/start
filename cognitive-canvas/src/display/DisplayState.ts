@@ -17,7 +17,7 @@ export interface DocumentState {
   id: string;
   title: string;
   content: string;
-  contentType: 'lexical' | 'canvas';
+  contentType: 'default' | 'lexical' | 'canvas' | 'ai-assistant';
   lastModified: number;
 }
 
@@ -142,7 +142,7 @@ class DisplayStateContainer {
       id: docId, 
       title: 'Untitled',
       content: '',
-      contentType: 'lexical' as const,
+      contentType: 'default' as const,
       lastModified: Date.now(),
       ...initialDoc
     };
@@ -180,7 +180,20 @@ class DisplayStateContainer {
     try {
       const stored = stateWorkerManager.loadStateSync();
       if (stored) {
-        this.state = { ...DEFAULT_DISPLAY_STATE, ...stored };
+        const loadedState = { ...DEFAULT_DISPLAY_STATE, ...stored };
+        
+        // Migrate documents without contentType to lexical
+        if (loadedState.documents) {
+          Object.keys(loadedState.documents).forEach(docId => {
+            const doc = loadedState.documents[docId];
+            if (!doc.contentType) {
+              doc.contentType = doc.content ? 'lexical' : 'default';
+              console.log(`🔄 Migrated document ${docId} to contentType: ${doc.contentType}`);
+            }
+          });
+        }
+        
+        this.state = loadedState;
         console.log('📂 Loaded display state from storage (sync)');
         this.notifyListeners();
       }
@@ -191,6 +204,18 @@ class DisplayStateContainer {
 
   saveToStorageSync(): void {
     stateWorkerManager.saveStateSync(this.state);
+  }
+
+  // Clear all stored data and reset to default state
+  clearStorage(): void {
+    try {
+      localStorage.removeItem('cognitive-canvas-state');
+      this.state = DEFAULT_DISPLAY_STATE;
+      this.notifyListeners();
+      console.log('🗑️ Cleared all stored data and reset to default state');
+    } catch (error) {
+      console.error('Failed to clear storage:', error);
+    }
   }
 }
 

@@ -27,6 +27,7 @@ registerDrawStep('Active Content', 3, async (context: RenderContext) => {
         documentId: activeTabId,
         title: document.title,
         content: document.content,
+        contentType: document.contentType,
         lastModified: document.lastModified
       };
       
@@ -66,9 +67,18 @@ export class ContentRenderer {
   }
 
   // Update document content type
-  static updateDocumentContentType(documentId: string, contentType: 'lexical' | 'canvas'): void {
+  static updateDocumentContentType(documentId: string, contentType: 'default' | 'lexical' | 'canvas' | 'ai-assistant'): void {
     console.log(`📄 Updating content type for document: ${documentId} to "${contentType}"`);
+    
+    // Get current document to verify update
+    const currentDoc = displayState.getState().documents[documentId];
+    console.log(`📄 Document before update:`, currentDoc);
+    
     displayState.updateDocument(documentId, { contentType });
+    
+    // Verify the update was applied
+    const updatedDoc = displayState.getState().documents[documentId];
+    console.log(`📄 Document after update:`, updatedDoc);
   }
 
   // Get active content for a panel
@@ -80,10 +90,13 @@ export class ContentRenderer {
       return null;
     }
     
-    return {
+    const result = {
       documentId: activeTabId,
       ...state.documents[activeTabId]
     };
+    
+    console.log(`📑 getActiveContentForPanel(${panelId}):`, result);
+    return result;
   }
 
   // Get document by ID

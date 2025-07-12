@@ -5,8 +5,10 @@
  * Simple, reliable, and well-architected.
  */
 
-import { useEffect } from 'react';
+import "./App.css";
+
 import { OrderedDisplay } from '@/components/OrderedDisplay';
+import { useEffect } from 'react';
 
 function App() {
   // Simple initialization log

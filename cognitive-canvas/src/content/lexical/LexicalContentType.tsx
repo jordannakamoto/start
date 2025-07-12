@@ -1,7 +1,7 @@
 // Lexical content type - rich text editor with toolbar
 // Uses Lexical for rich text editing capabilities
 
-import React, { useCallback, useEffect } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { $getRoot, EditorState, $createParagraphNode, $createTextNode } from 'lexical';
 import { LexicalComposer } from '@lexical/react/LexicalComposer';
 import { ContentEditable } from '@lexical/react/LexicalContentEditable';
@@ -22,21 +22,7 @@ import { ContentTypeDefinition, ContentEditorProps } from '../types';
 
 // Create editor configuration with initial state and unique namespace
 function createEditorConfig(initialContent: string, documentId: string) {
-  let initialEditorState = undefined;
-  
-  if (initialContent) {
-    try {
-      // Try to parse as JSON (Lexical state)
-      const parsed = JSON.parse(initialContent);
-      if (parsed && typeof parsed === 'object') {
-        initialEditorState = initialContent;
-      }
-    } catch {
-      // Fall back to undefined for plain text handling
-      initialEditorState = undefined;
-    }
-  }
-
+  // Always start with no initial state - we'll handle content in the plugin
   return {
     namespace: `CognitiveCanvas-${documentId}`, // Unique namespace per document
     nodes: [
@@ -78,9 +64,9 @@ function createEditorConfig(initialContent: string, documentId: string) {
       code: 'bg-gray-100 p-3 rounded font-mono text-sm block mb-2',
       quote: 'border-l-4 border-gray-300 pl-4 italic mb-2 text-gray-600',
     },
-    editorState: initialEditorState,
     onError: (error: Error) => {
       console.error('Lexical error:', error);
+      // Don't crash on errors - just log them
     },
   };
 }
@@ -97,23 +83,50 @@ function OnChangeContentPlugin({ onContentChange }: { onContentChange: (content:
   return <OnChangePlugin onChange={handleChange} />;
 }
 
-// Plugin to handle content that wasn't set in initial config
-function PlainTextInitPlugin({ content }: { content: string }) {
+// Plugin to handle initial content - both JSON state and plain text
+function InitialContentPlugin({ content }: { content: string }) {
   const [editor] = useLexicalComposerContext();
+  const [isInitialized, setIsInitialized] = useState(false);
 
   useEffect(() => {
-    // Only set content if it's plain text (not JSON)
-    if (content && !content.startsWith('{')) {
-      editor.update(() => {
-        const root = $getRoot();
-        root.clear();
+    if (isInitialized) return;
+
+    editor.update(() => {
+      const root = $getRoot();
+      root.clear();
+
+      if (content) {
+        try {
+          // Try to parse as JSON (Lexical serialized state)
+          const parsed = JSON.parse(content);
+          if (parsed && parsed.root && parsed.root.children) {
+            // Valid Lexical state - parse it
+            const editorState = editor.parseEditorState(content);
+            editor.setEditorState(editorState);
+            console.log('✅ Loaded Lexical state from JSON');
+            setIsInitialized(true);
+            return;
+          }
+        } catch {
+          // Not valid JSON, treat as plain text
+        }
+
+        // Handle as plain text
         const paragraph = $createParagraphNode();
         const textNode = $createTextNode(content);
         paragraph.append(textNode);
         root.append(paragraph);
-      });
-    }
-  }, []); // Only run once on mount
+        console.log('✅ Loaded plain text content');
+      } else {
+        // Empty content - create default paragraph
+        const paragraph = $createParagraphNode();
+        root.append(paragraph);
+        console.log('✅ Created empty document');
+      }
+
+      setIsInitialized(true);
+    });
+  }, [editor, content, isInitialized]);
 
   return null;
 }
@@ -130,15 +143,11 @@ function LexicalEditor({ documentId, content, onContentChange, isActive }: Conte
         </div>
         
         {/* Editor Container with scrolling */}
-        <div className="flex-1 min-h-0 relative overflow-hidden">
+        <div className="flex-1 min-h-0 overflow-y-auto relative">
           <RichTextPlugin
             contentEditable={
               <ContentEditable 
-                className="h-full p-4 outline-none border-none resize-none overflow-y-auto"
-                style={{ 
-                  minHeight: '100%',
-                  maxHeight: '100%'
-                }}
+                className="min-h-full p-4 outline-none border-none resize-none"
               />
             }
             placeholder={
@@ -154,7 +163,7 @@ function LexicalEditor({ documentId, content, onContentChange, isActive }: Conte
           <ListPlugin />
           <CheckListPlugin />
           <OnChangeContentPlugin onContentChange={onContentChange} />
-          <PlainTextInitPlugin content={content} />
+          <InitialContentPlugin content={content} />
         </div>
       </LexicalComposer>
     </div>

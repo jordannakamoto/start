@@ -1,5 +1,3 @@
-import "./App.css";
-
 import App from "./App";
 import React from "react";
 import ReactDOM from "react-dom/client";
@@ -18,6 +16,17 @@ async function showWindowWhenTauriReady() {
 
 // Initialize content types
 initializeContentTypes();
+
+// Add debug functions to global scope for development
+if (typeof window !== 'undefined') {
+  (window as any).clearAppStorage = () => {
+    localStorage.removeItem('cognitive-canvas-state');
+    localStorage.clear();
+    location.reload();
+  };
+  
+  console.log('🛠️ Debug: Use clearAppStorage() in console to clear all data');
+}
 
 // Call immediately since main.tsx only loads when Tauri API is ready
 showWindowWhenTauriReady();
