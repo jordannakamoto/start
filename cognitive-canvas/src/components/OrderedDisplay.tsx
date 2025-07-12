@@ -157,8 +157,8 @@ function PanelContent({ panelId }: { panelId: 'main' | 'sidebar' }) {
 
 
   return (
-    <div className="flex-1 flex flex-col">
-      <div className="p-4 border-b">
+    <div className="flex-1 flex flex-col h-full">
+      <div className="p-4 border-b flex-shrink-0">
         <input
           type="text"
           value={content.title}
@@ -167,7 +167,7 @@ function PanelContent({ panelId }: { panelId: 'main' | 'sidebar' }) {
           placeholder="Document title..."
         />
       </div>
-      <div className="flex-1">
+      <div className="flex-1 min-h-0">
         <ContentRenderer
           document={{
             id: content.documentId,

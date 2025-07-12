@@ -28,31 +28,39 @@ export function ContentRenderer({
     const lexicalContentType = contentTypeRegistry.get('lexical');
     if (!lexicalContentType) {
       return (
-        <div className="p-4 text-red-500">
+        <div className="p-4 text-red-500 h-full overflow-y-auto">
           Error: No content type available for rendering
         </div>
       );
     }
     
-    return lexicalContentType.renderEditor({
-      documentId: document.id,
-      content: document.content,
-      onContentChange,
-      onTitleChange,
-      isActive,
-      readOnly
-    });
+    return (
+      <div className="h-full">
+        {lexicalContentType.renderEditor({
+          documentId: document.id,
+          content: document.content,
+          onContentChange,
+          onTitleChange,
+          isActive,
+          readOnly
+        })}
+      </div>
+    );
   }
 
-  // Render using the appropriate content type
-  return contentTypeDef.renderEditor({
-    documentId: document.id,
-    content: document.content,
-    onContentChange,
-    onTitleChange,
-    isActive,
-    readOnly
-  });
+  // Render using the appropriate content type with proper height constraints
+  return (
+    <div className="h-full">
+      {contentTypeDef.renderEditor({
+        documentId: document.id,
+        content: document.content,
+        onContentChange,
+        onTitleChange,
+        isActive,
+        readOnly
+      })}
+    </div>
+  );
 }
 
 // Helper component for content type selection

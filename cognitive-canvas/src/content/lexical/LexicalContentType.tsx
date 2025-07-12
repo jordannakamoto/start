@@ -50,7 +50,7 @@ function createEditorConfig(initialContent: string, documentId: string) {
       LinkNode,
     ],
     theme: {
-      root: 'p-4 border-none outline-none min-h-full',
+      root: 'border-none outline-none min-h-full',
       paragraph: 'mb-3',
       heading: {
         h1: 'text-3xl font-bold mb-4 mt-6',
@@ -125,15 +125,20 @@ function LexicalEditor({ documentId, content, onContentChange, isActive }: Conte
     <div className="h-full flex flex-col">
       <LexicalComposer initialConfig={editorConfig} key={documentId}>
         {/* Toolbar */}
-        <ToolbarPlugin />
+        <div className="flex-shrink-0">
+          <ToolbarPlugin />
+        </div>
         
-        {/* Editor Container */}
-        <div className="flex-1 relative">
+        {/* Editor Container with scrolling */}
+        <div className="flex-1 min-h-0 relative overflow-hidden">
           <RichTextPlugin
             contentEditable={
               <ContentEditable 
-                className="h-full p-4 outline-none border-none resize-none"
-                style={{ minHeight: '100%' }}
+                className="h-full p-4 outline-none border-none resize-none overflow-y-auto"
+                style={{ 
+                  minHeight: '100%',
+                  maxHeight: '100%'
+                }}
               />
             }
             placeholder={
