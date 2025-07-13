@@ -1,7 +1,7 @@
 // Content Renderer Component - Renders content based on content type
 // Replaces the hardcoded textarea with pluggable content types
 
-import React from 'react';
+import React, { memo } from 'react';
 import { contentTypeRegistry, ContentType } from './types';
 import { DocumentState } from '../display/DisplayState';
 
@@ -13,13 +13,14 @@ interface ContentRendererProps {
   readOnly?: boolean;
 }
 
-export function ContentRenderer({ 
+// Memoized content renderer to prevent unnecessary re-renders
+export const ContentRenderer = memo<ContentRendererProps>(({ 
   document, 
   onContentChange, 
   onTitleChange, 
   isActive, 
   readOnly = false 
-}: ContentRendererProps) {
+}: ContentRendererProps) => {
   console.log('🔍 Rendering content type:', document.contentType, 'for document:', document.id);
   console.log('🔍 Full document object:', document);
   
@@ -53,7 +54,7 @@ export function ContentRenderer({
 
   // Render using the appropriate content type with proper height constraints
   return (
-    <div className="h-full">
+    <div className="h-full" style={{ display: isActive ? 'block' : 'none' }}>
       {contentTypeDef.renderEditor({
         documentId: document.id,
         content: document.content,
@@ -64,7 +65,16 @@ export function ContentRenderer({
       })}
     </div>
   );
-}
+}, (prevProps, nextProps) => {
+  // Custom comparison function for memo
+  return (
+    prevProps.document.id === nextProps.document.id &&
+    prevProps.document.content === nextProps.document.content &&
+    prevProps.document.contentType === nextProps.document.contentType &&
+    prevProps.isActive === nextProps.isActive &&
+    prevProps.readOnly === nextProps.readOnly
+  );
+});
 
 // Helper component for content type selection
 interface ContentTypeSelectorProps {

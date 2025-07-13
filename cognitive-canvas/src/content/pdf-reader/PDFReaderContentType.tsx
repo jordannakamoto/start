@@ -1,7 +1,7 @@
 // PDF Reader content type - displays PDF documents
 // Uses react-pdf library for PDF rendering
 
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useMemo, memo } from 'react';
 import { Document, Page, pdfjs } from 'react-pdf';
 import { ContentTypeDefinition, ContentEditorProps } from '../types';
 import 'react-pdf/dist/Page/AnnotationLayer.css';
@@ -16,12 +16,28 @@ interface PDFContent {
   title?: string;
 }
 
-function PDFReaderEditor({ content, onContentChange, onTitleChange, readOnly }: ContentEditorProps) {
+// Cache for rendered pages
+const pageCache = new Map<string, any>();
+
+// Memoized PDF page component for better performance
+const MemoizedPage = memo(Page);
+
+// Debounce function for scale changes
+function debounce<T extends (...args: any[]) => void>(func: T, wait: number): T {
+  let timeout: NodeJS.Timeout;
+  return ((...args: Parameters<T>) => {
+    clearTimeout(timeout);
+    timeout = setTimeout(() => func(...args), wait);
+  }) as T;
+}
+
+const PDFReaderEditor = memo<ContentEditorProps>(({ content, onContentChange, onTitleChange, readOnly, isActive }: ContentEditorProps) => {
   const [numPages, setNumPages] = useState<number>(0);
   const [pageNumber, setPageNumber] = useState<number>(1);
   const [scale, setScale] = useState<number>(1.0);
   const [error, setError] = useState<string | null>(null);
   const [pdfFile, setPdfFile] = useState<string | null>(null);
+  const [pageWidth, setPageWidth] = useState<number>(0);
 
   // Parse content to get PDF data
   let pdfData: PDFContent = {};
@@ -48,6 +64,9 @@ function PDFReaderEditor({ content, onContentChange, onTitleChange, readOnly }: 
     setNumPages(numPages);
     setPageNumber(1);
     setError(null);
+    
+    // Clear page cache when new document loads
+    pageCache.clear();
   }, []);
 
   const onDocumentLoadError = useCallback((error: Error) => {
@@ -106,9 +125,25 @@ function PDFReaderEditor({ content, onContentChange, onTitleChange, readOnly }: 
     });
   }, [numPages]);
 
+  // Debounced scale change to prevent too many re-renders
+  const debouncedSetScale = useMemo(
+    () => debounce((newScale: number) => {
+      setScale(Math.max(0.5, Math.min(3.0, newScale)));
+    }, 100),
+    []
+  );
+
   const changeScale = useCallback((newScale: number) => {
-    setScale(Math.max(0.5, Math.min(3.0, newScale)));
-  }, []);
+    debouncedSetScale(newScale);
+  }, [debouncedSetScale]);
+
+  // Preload adjacent pages for smoother navigation
+  const preloadPages = useMemo(() => {
+    const pages = [];
+    if (pageNumber > 1) pages.push(pageNumber - 1);
+    if (pageNumber < numPages) pages.push(pageNumber + 1);
+    return pages;
+  }, [pageNumber, numPages]);
 
   // If no PDF is loaded, show upload interface
   if (!pdfFile) {
@@ -164,14 +199,17 @@ function PDFReaderEditor({ content, onContentChange, onTitleChange, readOnly }: 
   }
 
   return (
-    <div className="h-full flex flex-col bg-gray-100">
+    <div 
+      className="h-full flex flex-col bg-gray-100"
+      style={{ visibility: isActive ? 'visible' : 'hidden', position: isActive ? 'static' : 'absolute' }}
+    >
       {/* Toolbar */}
       <div className="flex items-center justify-between p-3 bg-white border-b border-gray-200">
         <div className="flex items-center gap-3">
           <button
             onClick={() => changePage(-1)}
             disabled={pageNumber <= 1}
-            className="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed rounded"
+            className="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed rounded transition-colors duration-75"
           >
             Previous
           </button>
@@ -181,7 +219,7 @@ function PDFReaderEditor({ content, onContentChange, onTitleChange, readOnly }: 
           <button
             onClick={() => changePage(1)}
             disabled={pageNumber >= numPages}
-            className="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed rounded"
+            className="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed rounded transition-colors duration-75"
           >
             Next
           </button>
@@ -190,7 +228,7 @@ function PDFReaderEditor({ content, onContentChange, onTitleChange, readOnly }: 
         <div className="flex items-center gap-3">
           <button
             onClick={() => changeScale(scale - 0.1)}
-            className="px-2 py-1 text-sm bg-gray-100 hover:bg-gray-200 rounded"
+            className="px-2 py-1 text-sm bg-gray-100 hover:bg-gray-200 rounded transition-colors duration-75"
           >
             -
           </button>
@@ -199,7 +237,7 @@ function PDFReaderEditor({ content, onContentChange, onTitleChange, readOnly }: 
           </span>
           <button
             onClick={() => changeScale(scale + 0.1)}
-            className="px-2 py-1 text-sm bg-gray-100 hover:bg-gray-200 rounded"
+            className="px-2 py-1 text-sm bg-gray-100 hover:bg-gray-200 rounded transition-colors duration-75"
           >
             +
           </button>
@@ -232,21 +270,59 @@ function PDFReaderEditor({ content, onContentChange, onTitleChange, readOnly }: 
                 <div className="text-red-500">Failed to load PDF</div>
               </div>
             }
+            options={{
+              cMapUrl: 'cmaps/',
+              cMapPacked: true,
+            }}
           >
-            <Page
+            {/* Current page */}
+            <MemoizedPage
+              key={`page_${pageNumber}`}
               pageNumber={pageNumber}
               scale={scale}
               loading={<div className="text-gray-500">Loading page...</div>}
               error={<div className="text-red-500">Failed to load page</div>}
               renderTextLayer={false}
               renderAnnotationLayer={false}
+              renderMode="canvas"
+              width={pageWidth || undefined}
+              onRenderSuccess={() => {
+                const cacheKey = `${pdfFile}_${pageNumber}_${scale}`;
+                pageCache.set(cacheKey, true);
+              }}
+              onLoadSuccess={(page) => {
+                if (!pageWidth) {
+                  setPageWidth(page.width);
+                }
+              }}
             />
+            
+            {/* Preload adjacent pages (hidden) */}
+            {preloadPages.map(preloadPageNum => (
+              <div key={`preload_${preloadPageNum}`} style={{ display: 'none' }}>
+                <MemoizedPage
+                  pageNumber={preloadPageNum}
+                  scale={scale}
+                  renderTextLayer={false}
+                  renderAnnotationLayer={false}
+                  renderMode="canvas"
+                  width={pageWidth || undefined}
+                />
+              </div>
+            ))}
           </Document>
         )}
       </div>
     </div>
   );
-}
+}, (prevProps, nextProps) => {
+  // Custom memo comparison for PDF reader
+  return (
+    prevProps.content === nextProps.content &&
+    prevProps.isActive === nextProps.isActive &&
+    prevProps.readOnly === nextProps.readOnly
+  );
+});
 
 export const pdfReaderContentType: ContentTypeDefinition = {
   metadata: {

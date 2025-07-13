@@ -13,6 +13,7 @@ import { PanelRenderer } from '@/display/steps/01_PanelRenderer';
 import { TabRenderer } from '@/display/steps/02_TabRenderer';
 import { ContentRenderer as ContentRendererStep } from '@/display/steps/03_ContentRenderer';
 import { ContentRenderer } from '@/content/ContentRenderer';
+import { displayState } from '@/display/DisplayState';
 
 // Import all render steps to ensure they're registered
 import '@/display/steps/01_PanelRenderer';
@@ -165,29 +166,50 @@ function PanelTabBar({ panelId }: { panelId: 'main' | 'sidebar' }) {
   );
 }
 
-// Content area for a panel
+// Multi-tab content area that keeps all tabs in memory
 function PanelContent({ panelId }: { panelId: 'main' | 'sidebar' }) {
-  const [content, setContent] = useState<any>(null);
+  const [tabData, setTabData] = useState<any>(null);
+  const [allDocuments, setAllDocuments] = useState<Record<string, any>>({});
 
   useEffect(() => {
-    const updateContent = () => {
-      const layout = (window as any).contentLayout;
-      if (layout && layout[panelId]) {
-        setContent(layout[panelId]);
-      } else {
-        setContent(null);
+    const updateTabData = () => {
+      const state = displayState.getState();
+      const panelTabState = state.tabs[panelId];
+      
+      // Get all documents for this panel's tabs
+      const panelDocuments: Record<string, any> = {};
+      for (const tabId of panelTabState.tabIds) {
+        if (state.documents[tabId]) {
+          panelDocuments[tabId] = {
+            id: tabId,
+            ...state.documents[tabId]
+          };
+        }
       }
+      
+      setTabData(panelTabState);
+      setAllDocuments(panelDocuments);
+      
+      console.log(`📋 PanelContent update for ${panelId}:`, {
+        activeTabId: panelTabState.activeTabId,
+        tabIds: panelTabState.tabIds,
+        documentCount: Object.keys(panelDocuments).length
+      });
     };
 
     // Initial load
-    updateContent();
+    updateTabData();
 
     // Listen for content updates
-    window.addEventListener('content-rendered', updateContent);
-    return () => window.removeEventListener('content-rendered', updateContent);
+    window.addEventListener('content-rendered', updateTabData);
+    window.addEventListener('tabs-rendered', updateTabData);
+    return () => {
+      window.removeEventListener('content-rendered', updateTabData);
+      window.removeEventListener('tabs-rendered', updateTabData);
+    };
   }, [panelId]);
 
-  if (!content) {
+  if (!tabData || !tabData.activeTabId) {
     return (
       <div className="flex-1 flex items-center justify-center text-gray-500">
         No document selected
@@ -195,31 +217,17 @@ function PanelContent({ panelId }: { panelId: 'main' | 'sidebar' }) {
     );
   }
 
-  console.log('📋 PanelContent received:', {
-    documentId: content.documentId,
-    title: content.title,
-    content: content.content,
-    contentType: content.contentType,
-    rawContent: content
-  });
-
-  // Immediate updates - web worker handles persistence asynchronously
-  const handleTitleChange = (newTitle: string) => {
-    ContentRendererStep.updateDocumentTitle(content.documentId, newTitle);
-    firstDrawCoordinator.redraw();
-  };
-
-  const handleContentChange = (newContent: string) => {
+  // Create content change handlers for each document
+  const createContentChangeHandler = (documentId: string) => (newContent: string) => {
     // Check if this is a content type change request from default content type
     try {
       const parsed = JSON.parse(newContent);
       if (parsed.action === 'change-type') {
         console.log('🔄 Content type change requested:', parsed.newType, 'with content:', parsed.newContent);
-        console.log('🔍 Current document before change:', content);
         
         // Handle content type change
-        ContentRendererStep.updateDocumentContentType(content.documentId, parsed.newType);
-        ContentRendererStep.updateDocumentContent(content.documentId, parsed.newContent);
+        ContentRendererStep.updateDocumentContentType(documentId, parsed.newType);
+        ContentRendererStep.updateDocumentContent(documentId, parsed.newContent);
         
         console.log('🔄 Triggering redraw after content type change');
         firstDrawCoordinator.redraw();
@@ -229,26 +237,47 @@ function PanelContent({ panelId }: { panelId: 'main' | 'sidebar' }) {
       // Not a JSON change request, treat as normal content
     }
     
-    ContentRendererStep.updateDocumentContent(content.documentId, newContent);
+    ContentRendererStep.updateDocumentContent(documentId, newContent);
     firstDrawCoordinator.redraw();
   };
 
+  const createTitleChangeHandler = (documentId: string) => (newTitle: string) => {
+    ContentRendererStep.updateDocumentTitle(documentId, newTitle);
+    firstDrawCoordinator.redraw();
+  };
 
+  // Render all documents but only show the active one
   return (
-    <div className="h-full flex flex-col">
-      <ContentRenderer
-        key={`${content.documentId}-${content.contentType || 'default'}`}
-        document={{
-          id: content.documentId,
-          title: content.title,
-          content: content.content,
-          contentType: content.contentType || 'default',
-          lastModified: content.lastModified || Date.now()
-        }}
-        onContentChange={handleContentChange}
-        onTitleChange={handleTitleChange}
-        isActive={true}
-      />
+    <div className="h-full flex flex-col relative">
+      {Object.entries(allDocuments).map(([documentId, document]) => {
+        const isActive = documentId === tabData.activeTabId;
+        
+        return (
+          <div
+            key={documentId}
+            className="absolute inset-0"
+            style={{
+              visibility: isActive ? 'visible' : 'hidden',
+              zIndex: isActive ? 1 : 0,
+              pointerEvents: isActive ? 'auto' : 'none'
+            }}
+          >
+            <ContentRenderer
+              document={{
+                id: documentId,
+                title: document.title,
+                content: document.content,
+                contentType: document.contentType || 'default',
+                lastModified: document.lastModified || Date.now()
+              }}
+              onContentChange={createContentChangeHandler(documentId)}
+              onTitleChange={createTitleChangeHandler(documentId)}
+              isActive={isActive}
+              readOnly={false}
+            />
+          </div>
+        );
+      })}
     </div>
   );
 }
