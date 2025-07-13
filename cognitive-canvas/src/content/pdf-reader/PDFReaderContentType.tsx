@@ -1,14 +1,15 @@
-// PDF Reader content type - displays PDF documents
-// Uses react-pdf library for PDF rendering
+// PDF Reader content type - High-performance PDF.js integration with caching
+// Direct PDF.js usage for maximum control and performance
 
-import React, { useState, useCallback, useEffect, useMemo, memo } from 'react';
-import { Document, Page, pdfjs } from 'react-pdf';
+import React, { useState, useCallback, useEffect, useMemo, memo, useRef } from 'react';
+import * as pdfjsLib from 'pdfjs-dist';
 import { ContentTypeDefinition, ContentEditorProps } from '../types';
-import 'react-pdf/dist/Page/AnnotationLayer.css';
-import 'react-pdf/dist/Page/TextLayer.css';
 
-// Configure PDF.js worker to use the public directory worker
-pdfjs.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
+// Configure PDF.js worker
+pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
+  'pdfjs-dist/build/pdf.worker.min.mjs',
+  import.meta.url
+).toString();
 
 interface PDFContent {
   url?: string;
@@ -16,63 +17,222 @@ interface PDFContent {
   title?: string;
 }
 
-// Cache for rendered pages
-const pageCache = new Map<string, any>();
+// Canvas cache for rendered pages
+class PDFPageCache {
+  private cache = new Map<string, HTMLCanvasElement>();
+  private maxSize = 20;
 
-// Memoized PDF page component for better performance
-const MemoizedPage = memo(Page);
-
-// Debounce function for scale changes
-function debounce<T extends (...args: any[]) => void>(func: T, wait: number): T {
-  let timeout: NodeJS.Timeout;
-  return ((...args: Parameters<T>) => {
-    clearTimeout(timeout);
-    timeout = setTimeout(() => func(...args), wait);
-  }) as T;
-}
-
-const PDFReaderEditor = memo<ContentEditorProps>(({ content, onContentChange, onTitleChange, readOnly, isActive }: ContentEditorProps) => {
-  const [numPages, setNumPages] = useState<number>(0);
-  const [pageNumber, setPageNumber] = useState<number>(1);
-  const [scale, setScale] = useState<number>(1.0);
-  const [error, setError] = useState<string | null>(null);
-  const [pdfFile, setPdfFile] = useState<string | null>(null);
-  const [pageWidth, setPageWidth] = useState<number>(0);
-
-  // Parse content to get PDF data
-  let pdfData: PDFContent = {};
-  try {
-    pdfData = content ? JSON.parse(content) : {};
-  } catch (e) {
-    pdfData = {};
+  private getKey(docId: string, pageNum: number, scale: number): string {
+    return `${docId}_${pageNum}_${Math.round(scale * 100)}`;
   }
 
-  // Update PDF file when content changes
-  useEffect(() => {
-    console.log('PDF data updated:', { hasBase64: !!pdfData.base64, hasUrl: !!pdfData.url });
-    if (pdfData.base64) {
-      setPdfFile(`data:application/pdf;base64,${pdfData.base64}`);
-    } else if (pdfData.url) {
-      setPdfFile(pdfData.url);
-    } else {
-      setPdfFile(null);
+  get(docId: string, pageNum: number, scale: number): HTMLCanvasElement | null {
+    return this.cache.get(this.getKey(docId, pageNum, scale)) || null;
+  }
+
+  set(docId: string, pageNum: number, scale: number, canvas: HTMLCanvasElement): void {
+    const key = this.getKey(docId, pageNum, scale);
+    
+    // Clone canvas for cache
+    const cachedCanvas = document.createElement('canvas');
+    cachedCanvas.width = canvas.width;
+    cachedCanvas.height = canvas.height;
+    const ctx = cachedCanvas.getContext('2d');
+    if (ctx) {
+      ctx.drawImage(canvas, 0, 0);
     }
+    
+    this.cache.set(key, cachedCanvas);
+    
+    // Clean up if too large
+    if (this.cache.size > this.maxSize) {
+      const firstKey = this.cache.keys().next().value;
+      this.cache.delete(firstKey);
+    }
+  }
+
+  clear(docId?: string): void {
+    if (docId) {
+      for (const key of this.cache.keys()) {
+        if (key.startsWith(docId)) {
+          this.cache.delete(key);
+        }
+      }
+    } else {
+      this.cache.clear();
+    }
+  }
+}
+
+const pageCache = new PDFPageCache();
+
+const PDFReaderEditor = memo<ContentEditorProps>(({ content, onContentChange, onTitleChange, readOnly, isActive }: ContentEditorProps) => {
+  const [pdfDocument, setPdfDocument] = useState<pdfjsLib.PDFDocumentProxy | null>(null);
+  const [numPages, setNumPages] = useState<number>(0);
+  const [renderedPages, setRenderedPages] = useState<Set<number>>(new Set());
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState<boolean>(false);
+  const scale = 1.2; // Fixed 120% zoom
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const documentId = useRef<string>('');
+  const pageRefs = useRef<Map<number, HTMLCanvasElement>>(new Map());
+
+  // Parse content to get PDF data
+  const pdfData: PDFContent = useMemo(() => {
+    try {
+      return content ? JSON.parse(content) : {};
+    } catch (e) {
+      return {};
+    }
+  }, [content]);
+
+  // Load PDF document when content changes
+  useEffect(() => {
+    const loadPDF = async () => {
+      if (!pdfData.base64 && !pdfData.url) {
+        setPdfDocument(null);
+        return;
+      }
+
+      setLoading(true);
+      setError(null);
+
+      try {
+        let loadingTask;
+        
+        if (pdfData.base64) {
+          // Convert base64 to Uint8Array
+          const binaryString = atob(pdfData.base64);
+          const bytes = new Uint8Array(binaryString.length);
+          for (let i = 0; i < binaryString.length; i++) {
+            bytes[i] = binaryString.charCodeAt(i);
+          }
+          loadingTask = pdfjsLib.getDocument({ data: bytes });
+          documentId.current = `base64_${pdfData.base64.substring(0, 32)}`;
+        } else if (pdfData.url) {
+          loadingTask = pdfjsLib.getDocument(pdfData.url);
+          documentId.current = `url_${pdfData.url}`;
+        }
+
+        if (loadingTask) {
+          const pdf = await loadingTask.promise;
+          setPdfDocument(pdf);
+          setNumPages(pdf.numPages);
+          
+          // Clear cache for previous document
+          pageCache.clear(documentId.current);
+        }
+      } catch (err) {
+        console.error('PDF loading error:', err);
+        setError(err instanceof Error ? err.message : 'Failed to load PDF');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadPDF();
   }, [pdfData.base64, pdfData.url]);
 
-  const onDocumentLoadSuccess = useCallback(({ numPages }: { numPages: number }) => {
-    console.log('PDF loaded successfully, pages:', numPages);
-    setNumPages(numPages);
-    setPageNumber(1);
-    setError(null);
-    
-    // Clear page cache when new document loads
-    pageCache.clear();
-  }, []);
+  // Render individual page to canvas
+  const renderPage = useCallback(async (pageNum: number, canvas: HTMLCanvasElement) => {
+    if (!pdfDocument) return;
 
-  const onDocumentLoadError = useCallback((error: Error) => {
-    console.error('PDF load error:', error);
-    setError(`Failed to load PDF: ${error.message}`);
-  }, []);
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    // Check cache first
+    const cachedCanvas = pageCache.get(documentId.current, pageNum, scale);
+    if (cachedCanvas) {
+      // Use cached canvas - instant display
+      canvas.width = cachedCanvas.width;
+      canvas.height = cachedCanvas.height;
+      ctx.drawImage(cachedCanvas, 0, 0);
+      console.log(`📄 Used cached page ${pageNum}`);
+      return;
+    }
+
+    try {
+      const page = await pdfDocument.getPage(pageNum);
+      const viewport = page.getViewport({ scale });
+      
+      // Set canvas size
+      canvas.width = viewport.width;
+      canvas.height = viewport.height;
+      
+      // GPU acceleration hints
+      canvas.style.transform = 'translateZ(0)';
+      canvas.style.backfaceVisibility = 'hidden';
+
+      // Render page
+      const renderContext = {
+        canvasContext: ctx,
+        viewport: viewport,
+      };
+
+      await page.render(renderContext).promise;
+      
+      // Cache the rendered page
+      pageCache.set(documentId.current, pageNum, scale, canvas);
+      console.log(`📄 Rendered and cached page ${pageNum}`);
+      
+      // Mark as rendered
+      setRenderedPages(prev => new Set(prev).add(pageNum));
+      
+    } catch (err) {
+      console.error('Error rendering page:', err);
+    }
+  }, [pdfDocument, scale]);
+
+  // Intersection Observer for lazy loading pages
+  useEffect(() => {
+    if (!pdfDocument) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            const pageNum = parseInt(entry.target.getAttribute('data-page') || '0');
+            const canvas = entry.target as HTMLCanvasElement;
+            
+            if (pageNum > 0 && !renderedPages.has(pageNum)) {
+              renderPage(pageNum, canvas);
+            }
+          }
+        });
+      },
+      {
+        root: scrollContainerRef.current,
+        rootMargin: '500px', // Start loading pages 500px before they're visible
+        threshold: 0
+      }
+    );
+
+    // Observe all page canvases
+    pageRefs.current.forEach((canvas) => {
+      observer.observe(canvas);
+    });
+
+    return () => observer.disconnect();
+  }, [pdfDocument, renderPage, renderedPages]);
+
+  // Create canvas refs for all pages
+  useEffect(() => {
+    if (numPages > 0) {
+      const newPageRefs = new Map<number, HTMLCanvasElement>();
+      
+      for (let i = 1; i <= numPages; i++) {
+        const canvas = document.createElement('canvas');
+        canvas.setAttribute('data-page', i.toString());
+        canvas.className = 'block mx-auto mb-4 shadow-lg bg-white';
+        canvas.style.maxWidth = '100%';
+        canvas.style.height = 'auto';
+        newPageRefs.set(i, canvas);
+      }
+      
+      pageRefs.current = newPageRefs;
+      setRenderedPages(new Set()); // Reset rendered pages
+    }
+  }, [numPages]);
 
   const handleFileUpload = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -82,8 +242,6 @@ const PDFReaderEditor = memo<ContentEditorProps>(({ content, onContentChange, on
       reader.onload = (e) => {
         const base64 = e.target?.result as string;
         const base64Data = base64.split(',')[1]; // Remove data:application/pdf;base64, prefix
-        
-        console.log('File read complete, base64 length:', base64Data.length);
         
         const newContent: PDFContent = {
           base64: base64Data,
@@ -118,35 +276,8 @@ const PDFReaderEditor = memo<ContentEditorProps>(({ content, onContentChange, on
     }
   }, [onContentChange]);
 
-  const changePage = useCallback((offset: number) => {
-    setPageNumber(prevPageNumber => {
-      const newPage = prevPageNumber + offset;
-      return Math.max(1, Math.min(newPage, numPages));
-    });
-  }, [numPages]);
-
-  // Debounced scale change to prevent too many re-renders
-  const debouncedSetScale = useMemo(
-    () => debounce((newScale: number) => {
-      setScale(Math.max(0.5, Math.min(3.0, newScale)));
-    }, 100),
-    []
-  );
-
-  const changeScale = useCallback((newScale: number) => {
-    debouncedSetScale(newScale);
-  }, [debouncedSetScale]);
-
-  // Preload adjacent pages for smoother navigation
-  const preloadPages = useMemo(() => {
-    const pages = [];
-    if (pageNumber > 1) pages.push(pageNumber - 1);
-    if (pageNumber < numPages) pages.push(pageNumber + 1);
-    return pages;
-  }, [pageNumber, numPages]);
-
   // If no PDF is loaded, show upload interface
-  if (!pdfFile) {
+  if (!pdfDocument && !loading) {
     return (
       <div className="h-full flex items-center justify-center bg-gray-50">
         <div className="text-center max-w-md mx-auto p-6">
@@ -200,52 +331,24 @@ const PDFReaderEditor = memo<ContentEditorProps>(({ content, onContentChange, on
 
   return (
     <div 
-      className="h-full flex flex-col bg-gray-100"
+      className="h-full bg-gray-200"
       style={{ visibility: isActive ? 'visible' : 'hidden', position: isActive ? 'static' : 'absolute' }}
     >
-      {/* Toolbar */}
-      <div className="flex items-center justify-between p-3 bg-white border-b border-gray-200">
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => changePage(-1)}
-            disabled={pageNumber <= 1}
-            className="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed rounded transition-colors duration-75"
-          >
-            Previous
-          </button>
-          <span className="text-sm text-gray-600">
-            Page {pageNumber} of {numPages}
-          </span>
-          <button
-            onClick={() => changePage(1)}
-            disabled={pageNumber >= numPages}
-            className="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed rounded transition-colors duration-75"
-          >
-            Next
-          </button>
-        </div>
+      {/* Scrollable PDF Viewer */}
+      <div 
+        ref={scrollContainerRef}
+        className="h-full overflow-auto p-4"
+        style={{
+          scrollBehavior: 'smooth',
+          transform: 'translateZ(0)', // GPU acceleration for scroll
+        }}
+      >
+        {loading && (
+          <div className="flex items-center justify-center h-64">
+            <div className="text-gray-500">Loading PDF...</div>
+          </div>
+        )}
         
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => changeScale(scale - 0.1)}
-            className="px-2 py-1 text-sm bg-gray-100 hover:bg-gray-200 rounded transition-colors duration-75"
-          >
-            -
-          </button>
-          <span className="text-sm text-gray-600 min-w-[60px] text-center">
-            {Math.round(scale * 100)}%
-          </span>
-          <button
-            onClick={() => changeScale(scale + 0.1)}
-            className="px-2 py-1 text-sm bg-gray-100 hover:bg-gray-200 rounded transition-colors duration-75"
-          >
-            +
-          </button>
-        </div>
-      </div>
-
-      {/* PDF Viewer */}
-      <div className="flex-1 overflow-auto flex justify-center items-start p-4">
         {error && (
           <div className="flex items-center justify-center h-64">
             <div className="text-red-500 text-center">
@@ -255,62 +358,30 @@ const PDFReaderEditor = memo<ContentEditorProps>(({ content, onContentChange, on
           </div>
         )}
 
-        {!error && pdfFile && (
-          <Document
-            file={pdfFile}
-            onLoadSuccess={onDocumentLoadSuccess}
-            onLoadError={onDocumentLoadError}
-            loading={
-              <div className="flex items-center justify-center h-64">
-                <div className="text-gray-500">Loading PDF...</div>
-              </div>
-            }
-            error={
-              <div className="flex items-center justify-center h-64">
-                <div className="text-red-500">Failed to load PDF</div>
-              </div>
-            }
-            options={{
-              cMapUrl: 'cmaps/',
-              cMapPacked: true,
-            }}
-          >
-            {/* Current page */}
-            <MemoizedPage
-              key={`page_${pageNumber}`}
-              pageNumber={pageNumber}
-              scale={scale}
-              loading={<div className="text-gray-500">Loading page...</div>}
-              error={<div className="text-red-500">Failed to load page</div>}
-              renderTextLayer={false}
-              renderAnnotationLayer={false}
-              renderMode="canvas"
-              width={pageWidth || undefined}
-              onRenderSuccess={() => {
-                const cacheKey = `${pdfFile}_${pageNumber}_${scale}`;
-                pageCache.set(cacheKey, true);
-              }}
-              onLoadSuccess={(page) => {
-                if (!pageWidth) {
-                  setPageWidth(page.width);
-                }
-              }}
-            />
-            
-            {/* Preload adjacent pages (hidden) */}
-            {preloadPages.map(preloadPageNum => (
-              <div key={`preload_${preloadPageNum}`} style={{ display: 'none' }}>
-                <MemoizedPage
-                  pageNumber={preloadPageNum}
-                  scale={scale}
-                  renderTextLayer={false}
-                  renderAnnotationLayer={false}
-                  renderMode="canvas"
-                  width={pageWidth || undefined}
+        {pdfDocument && !loading && !error && (
+          <div className="max-w-4xl mx-auto">
+            {Array.from({ length: numPages }, (_, i) => i + 1).map((pageNum) => (
+              <div
+                key={pageNum}
+                className="mb-4 flex justify-center"
+                style={{ minHeight: '600px' }} // Prevent layout shift
+              >
+                <canvas
+                  ref={(canvas) => {
+                    if (canvas) {
+                      pageRefs.current.set(pageNum, canvas);
+                      canvas.setAttribute('data-page', pageNum.toString());
+                    }
+                  }}
+                  className="shadow-lg bg-white max-w-full h-auto"
+                  style={{
+                    transform: 'translateZ(0)', // GPU acceleration
+                    backfaceVisibility: 'hidden',
+                  }}
                 />
               </div>
             ))}
-          </Document>
+          </div>
         )}
       </div>
     </div>
