@@ -75,7 +75,7 @@ const PDFReaderEditor = memo<ContentEditorProps>(({ content, onContentChange, on
   const scale = 1.2; // Fixed 120% zoom
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const documentId = useRef<string>('');
-  const pageRefs = useRef<Map<number, HTMLCanvasElement>>(new Map());
+  const pageRefs = useRef<Map<number, HTMLDivElement>>(new Map());
 
   // Parse content to get PDF data
   const pdfData: PDFContent = useMemo(() => {
@@ -133,14 +133,19 @@ const PDFReaderEditor = memo<ContentEditorProps>(({ content, onContentChange, on
     loadPDF();
   }, [pdfData.base64, pdfData.url]);
 
-  // Render individual page to canvas
-  const renderPage = useCallback(async (pageNum: number, canvas: HTMLCanvasElement) => {
+  // Render individual page with text layer
+  const renderPage = useCallback(async (pageNum: number, container: HTMLDivElement) => {
     if (!pdfDocument) return;
+
+    const canvas = container.querySelector('canvas') as HTMLCanvasElement;
+    const textLayer = container.querySelector('.textLayer') as HTMLDivElement;
+    
+    if (!canvas || !textLayer) return;
 
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // Check cache first
+    // Check canvas cache first
     const cachedCanvas = pageCache.get(documentId.current, pageNum, scale);
     if (cachedCanvas) {
       // Use cached canvas - instant display
@@ -148,39 +153,96 @@ const PDFReaderEditor = memo<ContentEditorProps>(({ content, onContentChange, on
       canvas.height = cachedCanvas.height;
       ctx.drawImage(cachedCanvas, 0, 0);
       console.log(`📄 Used cached page ${pageNum}`);
-      return;
+    } else {
+      try {
+        const page = await pdfDocument.getPage(pageNum);
+        const viewport = page.getViewport({ scale });
+        
+        // Set canvas size
+        canvas.width = viewport.width;
+        canvas.height = viewport.height;
+        
+        // GPU acceleration hints
+        canvas.style.transform = 'translateZ(0)';
+        canvas.style.backfaceVisibility = 'hidden';
+
+        // Render page to canvas
+        const renderContext = {
+          canvasContext: ctx,
+          viewport: viewport,
+        };
+
+        await page.render(renderContext).promise;
+        
+        // Cache the rendered page
+        pageCache.set(documentId.current, pageNum, scale, canvas);
+        console.log(`📄 Rendered and cached page ${pageNum}`);
+        
+      } catch (err) {
+        console.error('Error rendering page canvas:', err);
+        return;
+      }
     }
 
+    // Render text layer for selection
     try {
       const page = await pdfDocument.getPage(pageNum);
       const viewport = page.getViewport({ scale });
       
-      // Set canvas size
-      canvas.width = viewport.width;
-      canvas.height = viewport.height;
+      // Set text layer size to match canvas
+      textLayer.style.width = `${viewport.width}px`;
+      textLayer.style.height = `${viewport.height}px`;
+      textLayer.style.position = 'absolute';
+      textLayer.style.top = '0';
+      textLayer.style.left = '0';
+      textLayer.style.color = 'transparent';
+      textLayer.style.fontSize = '1px';
+      textLayer.style.lineHeight = '1';
+      textLayer.style.whiteSpace = 'pre';
+      textLayer.style.userSelect = 'text';
+      textLayer.style.pointerEvents = 'auto';
       
-      // GPU acceleration hints
-      canvas.style.transform = 'translateZ(0)';
-      canvas.style.backfaceVisibility = 'hidden';
-
-      // Render page
-      const renderContext = {
-        canvasContext: ctx,
-        viewport: viewport,
-      };
-
-      await page.render(renderContext).promise;
+      // Clear previous text content
+      textLayer.innerHTML = '';
       
-      // Cache the rendered page
-      pageCache.set(documentId.current, pageNum, scale, canvas);
-      console.log(`📄 Rendered and cached page ${pageNum}`);
+      // Get text content
+      const textContent = await page.getTextContent();
       
-      // Mark as rendered
-      setRenderedPages(prev => new Set(prev).add(pageNum));
+      // Create text spans manually for better control
+      const textItems = textContent.items;
+      for (let i = 0; i < textItems.length; i++) {
+        const item = textItems[i] as any;
+        if (item.str) {
+          const span = document.createElement('span');
+          span.textContent = item.str;
+          
+          // Transform the coordinates
+          const tx = item.transform;
+          const x = tx[4];
+          const y = viewport.height - tx[5];
+          const fontSize = Math.sqrt(tx[0] * tx[0] + tx[1] * tx[1]);
+          
+          span.style.position = 'absolute';
+          span.style.left = `${x}px`;
+          span.style.top = `${y - fontSize}px`;
+          span.style.fontSize = `${fontSize}px`;
+          span.style.fontFamily = item.fontName || 'sans-serif';
+          span.style.color = 'transparent';
+          span.style.userSelect = 'text';
+          span.style.pointerEvents = 'auto';
+          
+          textLayer.appendChild(span);
+        }
+      }
+      
+      console.log(`📄 Rendered text layer for page ${pageNum}`);
       
     } catch (err) {
-      console.error('Error rendering page:', err);
+      console.error('Error rendering text layer:', err);
     }
+
+    // Mark as rendered
+    setRenderedPages(prev => new Set(prev).add(pageNum));
   }, [pdfDocument, scale]);
 
   // Intersection Observer for lazy loading pages
@@ -192,10 +254,10 @@ const PDFReaderEditor = memo<ContentEditorProps>(({ content, onContentChange, on
         entries.forEach((entry) => {
           if (entry.isIntersecting) {
             const pageNum = parseInt(entry.target.getAttribute('data-page') || '0');
-            const canvas = entry.target as HTMLCanvasElement;
+            const container = entry.target as HTMLDivElement;
             
             if (pageNum > 0 && !renderedPages.has(pageNum)) {
-              renderPage(pageNum, canvas);
+              renderPage(pageNum, container);
             }
           }
         });
@@ -207,29 +269,17 @@ const PDFReaderEditor = memo<ContentEditorProps>(({ content, onContentChange, on
       }
     );
 
-    // Observe all page canvases
-    pageRefs.current.forEach((canvas) => {
-      observer.observe(canvas);
+    // Observe all page containers
+    pageRefs.current.forEach((container) => {
+      observer.observe(container as Element);
     });
 
     return () => observer.disconnect();
   }, [pdfDocument, renderPage, renderedPages]);
 
-  // Create canvas refs for all pages
+  // Reset rendered pages when document changes
   useEffect(() => {
     if (numPages > 0) {
-      const newPageRefs = new Map<number, HTMLCanvasElement>();
-      
-      for (let i = 1; i <= numPages; i++) {
-        const canvas = document.createElement('canvas');
-        canvas.setAttribute('data-page', i.toString());
-        canvas.className = 'block mx-auto mb-4 shadow-lg bg-white';
-        canvas.style.maxWidth = '100%';
-        canvas.style.height = 'auto';
-        newPageRefs.set(i, canvas);
-      }
-      
-      pageRefs.current = newPageRefs;
       setRenderedPages(new Set()); // Reset rendered pages
     }
   }, [numPages]);
@@ -366,19 +416,32 @@ const PDFReaderEditor = memo<ContentEditorProps>(({ content, onContentChange, on
                 className="mb-4 flex justify-center"
                 style={{ minHeight: '600px' }} // Prevent layout shift
               >
-                <canvas
-                  ref={(canvas) => {
-                    if (canvas) {
-                      pageRefs.current.set(pageNum, canvas);
-                      canvas.setAttribute('data-page', pageNum.toString());
+                <div
+                  className="relative"
+                  data-page={pageNum.toString()}
+                  ref={(container) => {
+                    if (container) {
+                      pageRefs.current.set(pageNum, container as any);
                     }
                   }}
-                  className="shadow-lg bg-white max-w-full h-auto"
-                  style={{
-                    transform: 'translateZ(0)', // GPU acceleration
-                    backfaceVisibility: 'hidden',
-                  }}
-                />
+                >
+                  <canvas
+                    className="shadow-lg bg-white max-w-full h-auto block"
+                    style={{
+                      transform: 'translateZ(0)', // GPU acceleration
+                      backfaceVisibility: 'hidden',
+                    }}
+                  />
+                  <div
+                    className="textLayer absolute top-0 left-0 overflow-hidden"
+                    style={{
+                      pointerEvents: 'auto',
+                      userSelect: 'text',
+                      color: 'transparent',
+                      zIndex: 1
+                    }}
+                  />
+                </div>
               </div>
             ))}
           </div>
