@@ -3,7 +3,7 @@
 
 import { ReactElement } from 'react';
 
-export type ContentType = 'default' | 'lexical' | 'canvas' | 'ai-assistant';
+export type ContentType = 'default' | 'lexical' | 'canvas' | 'ai-assistant' | 'pdf-reader';
 
 export interface ContentTypeMetadata {
   type: ContentType;
