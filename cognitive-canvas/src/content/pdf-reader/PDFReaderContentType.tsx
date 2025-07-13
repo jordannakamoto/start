@@ -20,7 +20,6 @@ function PDFReaderEditor({ content, onContentChange, onTitleChange, readOnly }: 
   const [numPages, setNumPages] = useState<number>(0);
   const [pageNumber, setPageNumber] = useState<number>(1);
   const [scale, setScale] = useState<number>(1.0);
-  const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [pdfFile, setPdfFile] = useState<string | null>(null);
 
@@ -48,21 +47,17 @@ function PDFReaderEditor({ content, onContentChange, onTitleChange, readOnly }: 
     console.log('PDF loaded successfully, pages:', numPages);
     setNumPages(numPages);
     setPageNumber(1);
-    setLoading(false);
     setError(null);
   }, []);
 
   const onDocumentLoadError = useCallback((error: Error) => {
     console.error('PDF load error:', error);
     setError(`Failed to load PDF: ${error.message}`);
-    setLoading(false);
   }, []);
 
   const handleFileUpload = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file && file.type === 'application/pdf') {
-      setLoading(true);
-      
       // Convert file to base64
       const reader = new FileReader();
       reader.onload = (e) => {
@@ -83,12 +78,10 @@ function PDFReaderEditor({ content, onContentChange, onTitleChange, readOnly }: 
         
         // Update content
         onContentChange(JSON.stringify(newContent));
-        setLoading(false);
       };
       
       reader.onerror = () => {
         setError('Failed to read PDF file');
-        setLoading(false);
       };
       
       reader.readAsDataURL(file);
@@ -97,7 +90,6 @@ function PDFReaderEditor({ content, onContentChange, onTitleChange, readOnly }: 
 
   const handleURLSubmit = useCallback((url: string) => {
     if (url.trim()) {
-      setLoading(true);
       const newContent: PDFContent = {
         url: url.trim(),
         title: 'PDF Document'

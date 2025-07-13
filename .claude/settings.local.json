@@ -28,7 +28,8 @@
       "Bash(open:*)",
       "Bash(src-tauri/target/release/cognitive-canvas)",
       "Bash(./src-tauri/target/release/cognitive-canvas)",
-      "Bash(cp:*)"
+      "Bash(cp:*)",
+      "Bash(npx vite:*)"
     ],
     "deny": []
   }
