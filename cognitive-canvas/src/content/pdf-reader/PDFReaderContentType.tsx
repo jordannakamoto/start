@@ -267,6 +267,10 @@ const PDFDocumentViewer = memo(({ pages, scale }: { pages: pdfjsLib.PDFPageProxy
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     if (!textCanvasRef.current) return;
     
+    // Prevent default browser selection behavior
+    e.preventDefault();
+    e.stopPropagation();
+    
     const rect = textCanvasRef.current.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
@@ -290,20 +294,26 @@ const PDFDocumentViewer = memo(({ pages, scale }: { pages: pdfjsLib.PDFPageProxy
     const globalOffset = positionToOffset(x, y);
     
     if (globalOffset !== null && clickCountRef.current > 1) {
-      // Smart selection based on click count
+      // Smart selection with legal document support
       let newSelection: Selection | null = null;
       
       switch (clickCountRef.current) {
         case 2: // Double-click: Select word
           newSelection = selectWordAt(globalOffset);
           break;
-        case 3: // Triple-click: Select sentence
+        case 3: // Triple-click: Select sentence/clause
           newSelection = selectSentenceAt(globalOffset);
           break;
-        case 4: // Quad-click: Select paragraph
+        case 4: // Quad-click: Select legal clause
+          newSelection = selectionAPIRef.current.selectClauseAt(globalOffset);
+          break;
+        case 5: // 5-click: Select legal section
+          newSelection = selectionAPIRef.current.selectSectionAt(globalOffset);
+          break;
+        case 6: // 6-click: Select paragraph
           newSelection = selectParagraphAt(globalOffset);
           break;
-        default: // 5+ clicks: Select all text
+        default: // 7+ clicks: Select all text
           newSelection = selectAll();
           break;
       }
@@ -319,6 +329,7 @@ const PDFDocumentViewer = memo(({ pages, scale }: { pages: pdfjsLib.PDFPageProxy
     // Normal click - start manual selection
     isSelectingRef.current = true;
     selectionStartRef.current = { x, y };
+    selectionAPIRef.current.clearSelection();
     setSelection(null);
     
     // Clear selection canvas
@@ -333,14 +344,19 @@ const PDFDocumentViewer = memo(({ pages, scale }: { pages: pdfjsLib.PDFPageProxy
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
     if (!isSelectingRef.current || !textCanvasRef.current) return;
     
-    // Cancel previous animation frame
+    // Prevent default browser behavior
+    e.preventDefault();
+    
+    // Cancel previous animation frame for performance
     if (animationFrameRef.current) {
       cancelAnimationFrame(animationFrameRef.current);
     }
     
-    // Throttle updates using requestAnimationFrame
+    // Throttle updates using requestAnimationFrame for 60fps
     animationFrameRef.current = requestAnimationFrame(() => {
-      const rect = textCanvasRef.current!.getBoundingClientRect();
+      if (!textCanvasRef.current) return;
+      
+      const rect = textCanvasRef.current.getBoundingClientRect();
       const x = e.clientX - rect.left;
       const y = e.clientY - rect.top;
       
@@ -348,7 +364,11 @@ const PDFDocumentViewer = memo(({ pages, scale }: { pages: pdfjsLib.PDFPageProxy
     });
   }, [updateSelection]);
 
-  const handleMouseUp = useCallback(() => {
+  const handleMouseUp = useCallback((e: React.MouseEvent) => {
+    // Prevent default browser behavior
+    e.preventDefault();
+    e.stopPropagation();
+    
     isSelectingRef.current = false;
     selectionStartRef.current = null;
     
@@ -444,6 +464,9 @@ const PDFDocumentViewer = memo(({ pages, scale }: { pages: pdfjsLib.PDFPageProxy
   }, [pages, scale, calculateVisiblePages]);
 
 
+  // Track last visible pages for text model optimization
+  const lastVisiblePagesRef = useRef<string>('');
+  
   // Render text layer only (performance optimized)
   useEffect(() => {
     const renderTextLayer = () => {
@@ -529,12 +552,16 @@ const PDFDocumentViewer = memo(({ pages, scale }: { pages: pdfjsLib.PDFPageProxy
         }
       }
 
-      // Group text items into lines and build text model
+      // Group text items into lines
       const lines = groupTextIntoLines(allVisibleTextItems);
       textLinesRef.current = lines;
       
-      // Build text model for accurate selection using the new TextModel class
-      textModelRef.current.buildFromVisualItems(allVisibleTextItems);
+      // Only rebuild text model if visible pages changed (performance optimization)
+      const currentVisiblePagesKey = visiblePages.map(p => p.pageIndex).sort().join(',');
+      if (currentVisiblePagesKey !== lastVisiblePagesRef.current) {
+        textModelRef.current.buildFromVisualItems(allVisibleTextItems);
+        lastVisiblePagesRef.current = currentVisiblePagesKey;
+      }
 
       // Render all text directly to text canvas
       textCtx.fillStyle = '#1a1a1a';
@@ -658,17 +685,36 @@ const PDFDocumentViewer = memo(({ pages, scale }: { pages: pdfjsLib.PDFPageProxy
         <canvas
           ref={textCanvasRef}
           className="block"
-          style={{ position: 'absolute', top: 0, left: 0, pointerEvents: 'auto' }}
+          style={{ 
+            position: 'absolute', 
+            top: 0, 
+            left: 0, 
+            pointerEvents: 'none',
+            userSelect: 'none',
+            WebkitUserSelect: 'none',
+            MozUserSelect: 'none',
+            msUserSelect: 'none'
+          }}
         />
-        {/* Selection layer - transparent overlay */}
+        {/* Selection layer - transparent overlay with disabled browser selection */}
         <canvas
           ref={selectionCanvasRef}
           className="block cursor-text"
-          style={{ position: 'absolute', top: 0, left: 0, pointerEvents: 'auto' }}
+          style={{ 
+            position: 'absolute', 
+            top: 0, 
+            left: 0, 
+            pointerEvents: 'auto',
+            userSelect: 'none',
+            WebkitUserSelect: 'none',
+            MozUserSelect: 'none',
+            msUserSelect: 'none'
+          }}
           onMouseDown={handleMouseDown}
           onMouseMove={handleMouseMove}
           onMouseUp={handleMouseUp}
           onMouseLeave={handleMouseUp}
+          onContextMenu={(e) => e.preventDefault()}
         />
       </div>
 
@@ -677,21 +723,35 @@ const PDFDocumentViewer = memo(({ pages, scale }: { pages: pdfjsLib.PDFPageProxy
         Page {currentPage} of {pages.length}
       </div>
 
-      {/* Selection indicator with smart selection type */}
-      {selection && (
-        <div className="fixed top-4 left-4 text-xs text-gray-700 bg-yellow-200 px-2 py-1 rounded shadow border">
-          <div className="flex items-center gap-2">
-            <span>Selected: {getSelectedText().length} chars</span>
-            {clickCountRef.current > 1 && (
-              <span className="text-blue-600 font-medium">
-                {clickCountRef.current === 2 ? '📝 Word' :
-                 clickCountRef.current === 3 ? '📄 Sentence' :
-                 clickCountRef.current === 4 ? '📋 Paragraph' : '📚 All'}
-              </span>
-            )}
+      {/* Memoized selection indicator with legal document smart selection type */}
+      {useMemo(() => {
+        if (!selection) return null;
+        
+        const selectedText = getSelectedText();
+        const getSelectionTypeIcon = (count: number) => {
+          switch (count) {
+            case 2: return '📝 Word';
+            case 3: return '📄 Sentence';
+            case 4: return '⚖️ Clause';
+            case 5: return '📜 Section';
+            case 6: return '📋 Paragraph';
+            default: return '📚 All';
+          }
+        };
+        
+        return (
+          <div className="fixed top-4 left-4 text-xs text-gray-700 bg-yellow-200 px-2 py-1 rounded shadow border">
+            <div className="flex items-center gap-2">
+              <span>Selected: {selectedText.length} chars</span>
+              {clickCountRef.current > 1 && (
+                <span className="text-blue-600 font-medium">
+                  {getSelectionTypeIcon(clickCountRef.current)}
+                </span>
+              )}
+            </div>
           </div>
-        </div>
-      )}
+        );
+      }, [selection, getSelectedText])}
     </div>
   );
 });
@@ -866,13 +926,15 @@ const PDFReaderEditor = memo<ContentEditorProps>(({ content, onContentChange, on
               </div>
               
               {/* Smart selection help */}
-              <div className="bg-blue-50/90 backdrop-blur rounded-lg shadow-sm border border-blue-200 p-2 text-xs text-blue-800 max-w-48">
-                <div className="font-medium mb-1">Smart Selection:</div>
+              <div className="bg-blue-50/90 backdrop-blur rounded-lg shadow-sm border border-blue-200 p-2 text-xs text-blue-800 max-w-56">
+                <div className="font-medium mb-1">Legal Doc Smart Selection:</div>
                 <div>1× Click: Manual select</div>
                 <div>2× Click: Select word</div>
                 <div>3× Click: Select sentence</div>
-                <div>4× Click: Select paragraph</div>
-                <div>5× Click: Select all</div>
+                <div>4× Click: Select clause</div>
+                <div>5× Click: Select section</div>
+                <div>6× Click: Select paragraph</div>
+                <div>7× Click: Select all</div>
               </div>
             </div>
             

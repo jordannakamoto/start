@@ -408,6 +408,113 @@ export class SelectionAPI {
   }
 
   /**
+   * Select legal clause at global offset (for contracts/legal documents)
+   */
+  selectClauseAt(offset: number): Selection | null {
+    const text = this.textModel.getDocumentText();
+    if (offset >= text.length) return null;
+    
+    let start = offset;
+    let end = offset;
+    
+    // Legal clause patterns: numbered sections, lettered subsections, etc.
+    const clauseStartPattern = /(?:^|\n)\s*(?:\d+\.|\([a-z]\)|\([0-9]+\)|[A-Z]+\.)\s+/;
+    const clauseEndPattern = /(?:\n\s*(?:\d+\.|\([a-z]\)|\([0-9]+\)|[A-Z]+\.)\s+|\n\s*\n)/;
+    
+    // Find clause start
+    while (start > 0) {
+      const beforeText = text.slice(Math.max(0, start - 50), start);
+      const match = beforeText.match(clauseStartPattern);
+      if (match) {
+        start = Math.max(0, start - 50) + match.index! + match[0].length;
+        break;
+      }
+      start = Math.max(0, start - 50);
+    }
+    
+    // Find clause end
+    const remainingText = text.slice(end);
+    const endMatch = remainingText.match(clauseEndPattern);
+    if (endMatch) {
+      end = end + endMatch.index!;
+    } else {
+      end = text.length;
+    }
+    
+    const selection: Selection = { startOffset: start, endOffset: end };
+    this.setSelection(selection);
+    return selection;
+  }
+
+  /**
+   * Select legal section at global offset (for contracts/legal documents)
+   */
+  selectSectionAt(offset: number): Selection | null {
+    const text = this.textModel.getDocumentText();
+    if (offset >= text.length) return null;
+    
+    let start = offset;
+    let end = offset;
+    
+    // Legal section patterns: "Section 1", "Article I", "SECTION A", etc.
+    const sectionStartPattern = /(?:^|\n)\s*(?:SECTION|Section|ARTICLE|Article|PART|Part)\s+[IVX0-9A-Z]+[.\s]/i;
+    
+    // Find section start
+    while (start > 0) {
+      const beforeText = text.slice(Math.max(0, start - 100), start);
+      const match = beforeText.match(sectionStartPattern);
+      if (match) {
+        start = Math.max(0, start - 100) + match.index!;
+        break;
+      }
+      start = Math.max(0, start - 100);
+    }
+    
+    // Find next section start or end of document
+    const remainingText = text.slice(end);
+    const nextSectionMatch = remainingText.match(sectionStartPattern);
+    if (nextSectionMatch) {
+      end = end + nextSectionMatch.index!;
+    } else {
+      end = text.length;
+    }
+    
+    const selection: Selection = { startOffset: start, endOffset: end };
+    this.setSelection(selection);
+    return selection;
+  }
+
+  /**
+   * Select legal definition at global offset (for contracts/legal documents)
+   */
+  selectDefinitionAt(offset: number): Selection | null {
+    const text = this.textModel.getDocumentText();
+    if (offset >= text.length) return null;
+    
+    let start = offset;
+    let end = offset;
+    
+    // Look for quoted terms, capitalized terms, or terms in parentheses
+    const definitionPattern = /"[^"]+"|'[^']+'|\b[A-Z][A-Z\s]+\b|\([^)]*\)/;
+    
+    // Expand to find definition boundaries
+    while (start > 0 && !/[.;]/.test(text[start - 1])) {
+      start--;
+    }
+    
+    while (end < text.length && !/[.;]/.test(text[end])) {
+      end++;
+    }
+    
+    // Include the punctuation
+    if (end < text.length) end++;
+    
+    const selection: Selection = { startOffset: start, endOffset: end };
+    this.setSelection(selection);
+    return selection;
+  }
+
+  /**
    * Select paragraph at global offset
    */
   selectParagraphAt(offset: number): Selection | null {
