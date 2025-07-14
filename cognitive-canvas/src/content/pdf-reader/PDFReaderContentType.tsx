@@ -4,7 +4,9 @@
 import * as pdfjsLib from 'pdfjs-dist';
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ContentEditorProps, ContentTypeDefinition } from '../types';
-import { FastSelectionAPI, FastSelection } from './FastSelection';
+import { FastSelection } from './FastSelection';
+import { Selection } from './SelectionAPI';
+import { SelectionEventHandler } from './SelectionEventHandler';
 
 // Fast selection system - speed optimized
 
@@ -39,15 +41,13 @@ const PDFDocumentViewer = memo(({ pages, scale }: { pages: pdfjsLib.PDFPageProxy
   const containerRef = useRef<HTMLDivElement>(null);
   const textCanvasRef = useRef<HTMLCanvasElement>(null);
   const selectionCanvasRef = useRef<HTMLCanvasElement>(null);
-  const selectionAPIRef = useRef<FastSelectionAPI>(new FastSelectionAPI());
+  const fastSelectionRef = useRef<FastSelection>(new FastSelection());
+  const eventHandlerRef = useRef<SelectionEventHandler | null>(null);
   const pagesInfoRef = useRef<PageInfo[]>([]);
   const visiblePagesRef = useRef<VisiblePage[]>([]);
   const prerenderedTextRef = useRef<Map<number, any[]>>(new Map());
-  const isSelectingRef = useRef(false);
-  const selectionStartRef = useRef<{x: number, y: number} | null>(null);
-  const animationFrameRef = useRef<number | null>(null);
   const scrollUpdateRef = useRef<number | null>(null);
-  const [selection, setSelection] = useState<FastSelection | null>(null);
+  const [selection, setSelection] = useState<Selection | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [visiblePages, setVisiblePages] = useState<VisiblePage[]>([]);
   const [scrollPosition, setScrollPosition] = useState(0);
@@ -99,15 +99,32 @@ const PDFDocumentViewer = memo(({ pages, scale }: { pages: pdfjsLib.PDFPageProxy
     return pagesInfoRef.current.length;
   }, []);
 
-  // Fast coordinate to character conversion
-  const coordsToChar = useCallback((x: number, y: number): number => {
-    return selectionAPIRef.current.coordsToChar(x, y);
+  // Initialize event handler
+  useEffect(() => {
+    if (!eventHandlerRef.current) {
+      eventHandlerRef.current = new SelectionEventHandler(fastSelectionRef.current, {
+        onSelectionChange: (newSelection) => {
+          setSelection(newSelection);
+        }
+      });
+      eventHandlerRef.current.setupGlobalListeners();
+    }
+    
+    // Set canvas elements when available
+    if (textCanvasRef.current && selectionCanvasRef.current) {
+      eventHandlerRef.current.setCanvasElements(textCanvasRef.current, selectionCanvasRef.current);
+    }
+    
+    return () => {
+      if (eventHandlerRef.current) {
+        eventHandlerRef.current.destroy();
+        eventHandlerRef.current = null;
+      }
+    };
   }, []);
 
-
-
   const drawSelection = useCallback((ctx: CanvasRenderingContext2D) => {
-    const rects = selectionAPIRef.current.getSelectionRects();
+    const rects = fastSelectionRef.current.getSelectionRects();
     if (rects.length === 0) return;
     
     ctx.fillStyle = 'rgba(0, 123, 255, 0.3)';
@@ -119,87 +136,8 @@ const PDFDocumentViewer = memo(({ pages, scale }: { pages: pdfjsLib.PDFPageProxy
   }, []);
 
   const getSelectedText = useCallback((): string => {
-    return selectionAPIRef.current.getSelectedText();
+    return fastSelectionRef.current.getSelectedText();
   }, []);
-
-
-  const updateSelection = useCallback((x: number, y: number) => {
-    if (!isSelectingRef.current || !selectionStartRef.current) return;
-    
-    const startChar = coordsToChar(selectionStartRef.current.x, selectionStartRef.current.y);
-    const endChar = coordsToChar(x, y);
-    
-    // Set selection immediately - fast
-    selectionAPIRef.current.setSelection(startChar, endChar);
-    setSelection(selectionAPIRef.current.getSelection());
-  }, [coordsToChar]);
-
-  const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    if (!textCanvasRef.current) return;
-    
-    // Prevent browser selection
-    e.preventDefault();
-    e.stopPropagation();
-    
-    // Clear browser selection
-    if (window.getSelection) {
-      window.getSelection()?.removeAllRanges();
-    }
-    
-    const rect = textCanvasRef.current.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    
-    // Start selection
-    isSelectingRef.current = true;
-    selectionStartRef.current = { x, y };
-    selectionAPIRef.current.clearSelection();
-    setSelection(null);
-  }, []);
-
-  const handleMouseMove = useCallback((e: React.MouseEvent) => {
-    if (!isSelectingRef.current || !textCanvasRef.current) return;
-    
-    e.preventDefault();
-    
-    // Throttle with requestAnimationFrame
-    if (animationFrameRef.current) {
-      cancelAnimationFrame(animationFrameRef.current);
-    }
-    
-    animationFrameRef.current = requestAnimationFrame(() => {
-      if (!textCanvasRef.current) return;
-      
-      const rect = textCanvasRef.current.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
-      
-      updateSelection(x, y);
-    });
-  }, [updateSelection]);
-
-  const handleMouseUp = useCallback(() => {
-    isSelectingRef.current = false;
-    selectionStartRef.current = null;
-    
-    if (animationFrameRef.current) {
-      cancelAnimationFrame(animationFrameRef.current);
-      animationFrameRef.current = null;
-    }
-  }, []);
-
-
-  const handleKeyDown = useCallback((e: KeyboardEvent) => {
-    if ((e.ctrlKey || e.metaKey) && e.key === 'c' && selection) {
-      const text = getSelectedText();
-      navigator.clipboard.writeText(text);
-    }
-  }, [selection, getSelectedText]);
-
-  useEffect(() => {
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [handleKeyDown]);
 
   // Pre-render all text content to avoid async operations during scroll
   useEffect(() => {
@@ -368,7 +306,7 @@ const PDFDocumentViewer = memo(({ pages, scale }: { pages: pdfjsLib.PDFPageProxy
       const currentVisiblePagesKey = visiblePages.map(p => p.pageIndex).sort().join(',');
       if (currentVisiblePagesKey !== lastVisiblePagesRef.current) {
         // Initialize fast selection with simple text items
-        selectionAPIRef.current.init(allVisibleTextItems);
+        fastSelectionRef.current.init(allVisibleTextItems);
         lastVisiblePagesRef.current = currentVisiblePagesKey;
       }
 
@@ -530,11 +468,11 @@ const PDFDocumentViewer = memo(({ pages, scale }: { pages: pdfjsLib.PDFPageProxy
             MozUserSelect: 'none',
             msUserSelect: 'none'
           }}
-          onMouseDown={handleMouseDown}
-          onMouseMove={handleMouseMove}
-          onMouseUp={handleMouseUp}
-          onMouseLeave={handleMouseUp}
-          onContextMenu={(e) => e.preventDefault()}
+          onMouseDown={eventHandlerRef.current?.handleMouseDown}
+          onMouseMove={eventHandlerRef.current?.handleMouseMove}
+          onMouseUp={eventHandlerRef.current?.handleMouseUp}
+          onMouseLeave={eventHandlerRef.current?.handleMouseLeave}
+          onContextMenu={eventHandlerRef.current?.handleContextMenu}
         />
       </div>
 

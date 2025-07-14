@@ -1,22 +1,15 @@
-// Modern Selection API for PDF Reader
-// Provides clean abstraction between display layer and data layer
+// SelectionAPI.ts - Expanded API for deep interaction from other systems
+// Uses TextModel for data, provides advanced selection operations
+// NO UI logic - that belongs in FastSelection
 
-export interface TextItem {
-  str: string;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  fontSize: number;
-  fontFamily: string;
-  pageIndex: number;
-  globalCharIndex: number; // NEW: direct mapping to global text position
-}
+import { TextModel } from './TextModel';
 
 export interface Selection {
-  startOffset: number;
-  endOffset: number;
-  type: 'manual' | 'word' | 'sentence' | 'line' | 'clause' | 'section' | 'all';
+  id: string;
+  start: number;
+  end: number;
+  type: 'user' | 'search' | 'highlight' | 'annotation' | 'smart';
+  metadata?: any;
 }
 
 export interface SelectionBounds {
@@ -25,191 +18,166 @@ export interface SelectionBounds {
     y: number;
     width: number;
     height: number;
-    pageIndex: number;
+    selectionId: string;
   }>;
 }
 
-export interface ViewportInfo {
-  scrollTop: number;
-  containerWidth: number;
-  containerHeight: number;
-  scale: number;
-}
-
 /**
- * Core text model - simplified and focused on essential operations
+ * SelectionAPI - Expanded API for deep interaction from other systems
+ * Delegates all data operations to TextModel
+ * Provides advanced selection features for external system integration
  */
-export class TextModel {
-  private documentText: string = '';
-  private textItems: TextItem[] = []; // Flattened, globally indexed text items
-  private globalCharToItem: Map<number, TextItem> = new Map();
-  
-  constructor() {}
+export class SelectionAPI {
+  private textModel: TextModel;
+  private selections: Map<string, Selection> = new Map();
+  private listeners: ((selections: Map<string, Selection>) => void)[] = [];
+  private nextId: number = 0;
 
-  /**
-   * Build model from visual items with global character indexing
-   */
-  buildFromVisualItems(visualItems: TextItem[]): void {
-    this.clear();
-    
-    // Sort items by reading order (page, y, x)
-    const sortedItems = [...visualItems].sort((a, b) => {
-      if (a.pageIndex !== b.pageIndex) return a.pageIndex - b.pageIndex;
-      if (Math.abs(a.y - b.y) > 5) return a.y - b.y; // Line tolerance
-      return a.x - b.x;
-    });
-
-    // Build global text and character mappings
-    let globalCharIndex = 0;
-    let documentText = '';
-    
-    for (let i = 0; i < sortedItems.length; i++) {
-      const item = sortedItems[i];
-      const itemText = item.str;
-      
-      // Create enhanced text item with global character index
-      const enhancedItem: TextItem = {
-        ...item,
-        globalCharIndex
-      };
-      
-      this.textItems.push(enhancedItem);
-      
-      // Map each character to its text item
-      for (let charIdx = 0; charIdx < itemText.length; charIdx++) {
-        this.globalCharToItem.set(globalCharIndex + charIdx, enhancedItem);
-      }
-      
-      documentText += itemText;
-      globalCharIndex += itemText.length;
-      
-      // Add space between items if needed (simple heuristic)
-      const nextItem = sortedItems[i + 1];
-      if (nextItem && this.shouldAddSpace(item, nextItem)) {
-        documentText += ' ';
-        globalCharIndex += 1;
-      }
-    }
-    
-    this.documentText = documentText;
+  constructor(textModel: TextModel) {
+    this.textModel = textModel;
   }
 
   /**
-   * Convert screen coordinates to global character offset
+   * Initialize with text model (delegates to TextModel)
+   */
+  initialize(visualItems: any[]): void {
+    this.textModel.buildFromVisualItems(visualItems);
+    this.clearAllSelections();
+  }
+
+  /**
+   * BASIC SELECTION OPERATIONS
+   */
+
+  /**
+   * Create selection by character range
+   */
+  createSelection(start: number, end: number, type: Selection['type'] = 'user', metadata?: any): Selection {
+    const selection: Selection = {
+      id: `sel_${this.nextId++}`,
+      start: Math.min(start, end),
+      end: Math.max(start, end),
+      type,
+      metadata
+    };
+
+    this.selections.set(selection.id, selection);
+    this.notifyListeners();
+    return selection;
+  }
+
+  /**
+   * Update existing selection
+   */
+  updateSelection(id: string, start: number, end: number): boolean {
+    const selection = this.selections.get(id);
+    if (!selection) return false;
+
+    selection.start = Math.min(start, end);
+    selection.end = Math.max(start, end);
+    this.notifyListeners();
+    return true;
+  }
+
+  /**
+   * Remove selection
+   */
+  removeSelection(id: string): boolean {
+    const removed = this.selections.delete(id);
+    if (removed) this.notifyListeners();
+    return removed;
+  }
+
+  /**
+   * Get all selections
+   */
+  getSelections(): Map<string, Selection> {
+    return new Map(this.selections);
+  }
+
+  /**
+   * Get primary user selection
+   */
+  getPrimarySelection(): Selection | null {
+    const userSelections = this.getSelectionsByType('user');
+    return userSelections.length > 0 ? userSelections[userSelections.length - 1] : null;
+  }
+
+  /**
+   * Get selections by type
+   */
+  getSelectionsByType(type: Selection['type']): Selection[] {
+    return Array.from(this.selections.values()).filter(sel => sel.type === type);
+  }
+
+  /**
+   * Clear selections (all or by type)
+   */
+  clearSelections(type?: Selection['type']): void {
+    if (type) {
+      for (const [id, selection] of this.selections) {
+        if (selection.type === type) {
+          this.selections.delete(id);
+        }
+      }
+    } else {
+      this.selections.clear();
+    }
+    this.notifyListeners();
+  }
+
+  /**
+   * Clear all selections (convenience method)
+   */
+  clearAllSelections(): void {
+    this.clearSelections();
+  }
+
+  /**
+   * COORDINATE OPERATIONS (delegates to TextModel)
+   */
+
+  /**
+   * Convert coordinates to character offset
    */
   coordinatesToOffset(x: number, y: number): number | null {
-    // Find closest text item
-    let closestItem: TextItem | null = null;
-    let minDistance = Infinity;
-    
-    for (const item of this.textItems) {
-      const distance = Math.sqrt(
-        Math.pow(x - (item.x + item.width / 2), 2) + 
-        Math.pow(y - item.y, 2)
-      );
-      
-      if (distance < minDistance) {
-        minDistance = distance;
-        closestItem = item;
-      }
-    }
-    
-    if (!closestItem) return null;
-    
-    // Calculate character position within the item
-    const relativeX = x - closestItem.x;
-    const charWidth = closestItem.width / closestItem.str.length;
-    const charIndex = Math.max(0, Math.min(
-      Math.round(relativeX / charWidth),
-      closestItem.str.length
-    ));
-    
-    return closestItem.globalCharIndex + charIndex;
+    return this.textModel.coordinatesToOffset(x, y);
   }
+
+  /**
+   * TEXT OPERATIONS (delegates to TextModel)
+   */
 
   /**
    * Get text for selection
    */
   getSelectionText(selection: Selection): string {
-    const start = Math.max(0, selection.startOffset);
-    const end = Math.min(this.documentText.length, selection.endOffset);
-    return this.documentText.slice(start, end);
+    return this.textModel.getText(selection.start, selection.end);
   }
 
   /**
-   * Get visual bounds for selection
+   * Get text for primary selection
    */
-  getSelectionBounds(selection: Selection): SelectionBounds {
-    const rects: SelectionBounds['rects'] = [];
-    const start = Math.max(0, selection.startOffset);
-    const end = Math.min(this.documentText.length, selection.endOffset);
-    
-    if (start >= end) return { rects };
-    
-    // Group characters into visual rectangles
-    let currentRect: SelectionBounds['rects'][0] | null = null;
-    
-    for (let charIndex = start; charIndex < end; charIndex++) {
-      const item = this.globalCharToItem.get(charIndex);
-      if (!item) continue;
-      
-      const charPositionInItem = charIndex - item.globalCharIndex;
-      const charWidth = item.width / item.str.length;
-      const charX = item.x + (charPositionInItem * charWidth);
-      
-      // Check if we can extend current rectangle
-      if (currentRect && 
-          currentRect.pageIndex === item.pageIndex &&
-          Math.abs(currentRect.y - (item.y - item.fontSize * 0.8)) < 2 &&
-          Math.abs(currentRect.x + currentRect.width - charX) < 2) {
-        // Extend current rectangle
-        currentRect.width = charX + charWidth - currentRect.x;
-      } else {
-        // Start new rectangle
-        if (currentRect) rects.push(currentRect);
-        currentRect = {
-          x: charX,
-          y: item.y - item.fontSize * 0.8,
-          width: charWidth,
-          height: item.fontSize * 1.2,
-          pageIndex: item.pageIndex
-        };
-      }
-    }
-    
-    if (currentRect) rects.push(currentRect);
-    return { rects };
+  getSelectedText(): string {
+    const primary = this.getPrimarySelection();
+    if (!primary) return '';
+    return this.getSelectionText(primary);
   }
 
   /**
-   * Get complete document text
+   * Get full document text
    */
   getDocumentText(): string {
-    return this.documentText;
+    return this.textModel.getDocumentText();
   }
 
-  private clear(): void {
-    this.documentText = '';
-    this.textItems = [];
-    this.globalCharToItem.clear();
-  }
+  /**
+   * SMART SELECTION OPERATIONS
+   */
 
-  private shouldAddSpace(current: TextItem, next: TextItem): boolean {
-    // Add space if there's a significant gap or different page
-    if (current.pageIndex !== next.pageIndex) return true;
-    if (Math.abs(current.y - next.y) > 5) return true; // Different line
-    
-    const gap = next.x - (current.x + current.width);
-    return gap > current.fontSize * 0.3; // Significant horizontal gap
-  }
-}
-
-/**
- * Smart selection algorithms with simple delimiters
- */
-export class SmartSelector {
-  constructor(private textModel: TextModel) {}
-
+  /**
+   * Select word at offset
+   */
   selectWordAt(offset: number): Selection | null {
     const text = this.textModel.getDocumentText();
     if (offset >= text.length) return null;
@@ -217,14 +185,17 @@ export class SmartSelector {
     let start = offset;
     let end = offset;
 
-    // Expand to word boundaries (spaces/punctuation)
+    // Expand to word boundaries
     while (start > 0 && !/[\s\n\t.,;!?]/.test(text[start - 1])) start--;
     while (end < text.length && !/[\s\n\t.,;!?]/.test(text[end])) end++;
 
     if (start === end) return null;
-    return { startOffset: start, endOffset: end, type: 'word' };
+    return this.createSelection(start, end, 'smart');
   }
 
+  /**
+   * Select sentence at offset
+   */
   selectSentenceAt(offset: number): Selection | null {
     const text = this.textModel.getDocumentText();
     if (offset >= text.length) return null;
@@ -239,9 +210,12 @@ export class SmartSelector {
     while (end < text.length && !/[.!?]/.test(text[end])) end++;
     if (end < text.length) end++; // Include the punctuation
 
-    return { startOffset: start, endOffset: end, type: 'sentence' };
+    return this.createSelection(start, end, 'smart');
   }
 
+  /**
+   * Select line at offset
+   */
   selectLineAt(offset: number): Selection | null {
     const text = this.textModel.getDocumentText();
     if (offset >= text.length) return null;
@@ -253,199 +227,139 @@ export class SmartSelector {
     while (start > 0 && text[start - 1] !== '\n') start--;
     while (end < text.length && text[end] !== '\n') end++;
 
-    return { startOffset: start, endOffset: end, type: 'line' };
-  }
-
-  selectClauseAt(offset: number): Selection | null {
-    const text = this.textModel.getDocumentText();
-    if (offset >= text.length) return null;
-
-    let start = offset;
-    let end = offset;
-
-    // Find clause patterns (numbered/lettered items)
-    const clausePattern = /^\s*(?:\d+\.|[a-z]\)|[A-Z]\.)/;
-    
-    // Go to start of current line
-    while (start > 0 && text[start - 1] !== '\n') start--;
-    
-    // Find next clause or end
-    while (end < text.length) {
-      if (text[end] === '\n' && end + 1 < text.length) {
-        const lineStart = end + 1;
-        const lineEnd = text.indexOf('\n', lineStart);
-        const line = text.slice(lineStart, lineEnd === -1 ? text.length : lineEnd);
-        if (clausePattern.test(line)) break;
-      }
-      end++;
-    }
-
-    return { startOffset: start, endOffset: end, type: 'clause' };
-  }
-
-  selectSectionAt(offset: number): Selection | null {
-    const text = this.textModel.getDocumentText();
-    if (offset >= text.length) return null;
-
-    let start = offset;
-    let end = offset;
-
-    // Find section headers
-    const sectionPattern = /^\s*(?:SECTION|Section|ARTICLE|Article)\s+[IVX\d]+/i;
-    
-    // Find current or previous section start
-    while (start > 0) {
-      const lineStart = text.lastIndexOf('\n', start - 1) + 1;
-      const lineEnd = text.indexOf('\n', lineStart);
-      const line = text.slice(lineStart, lineEnd === -1 ? text.length : lineEnd);
-      
-      if (sectionPattern.test(line)) {
-        start = lineStart;
-        break;
-      }
-      start = lineStart - 1;
-    }
-
-    // Find next section or end
-    while (end < text.length) {
-      const lineStart = text.indexOf('\n', end) + 1;
-      if (lineStart === 0) break;
-      
-      const lineEnd = text.indexOf('\n', lineStart);
-      const line = text.slice(lineStart, lineEnd === -1 ? text.length : lineEnd);
-      
-      if (sectionPattern.test(line)) {
-        end = lineStart - 1;
-        break;
-      }
-      end = lineEnd === -1 ? text.length : lineEnd;
-    }
-
-    return { startOffset: start, endOffset: end, type: 'section' };
-  }
-
-  selectAll(): Selection {
-    const text = this.textModel.getDocumentText();
-    return { startOffset: 0, endOffset: text.length, type: 'all' };
-  }
-}
-
-/**
- * Main Selection API - coordinates between display and data layers
- */
-export class SelectionAPI {
-  private textModel: TextModel;
-  private smartSelector: SmartSelector;
-  private currentSelection: Selection | null = null;
-  private listeners: ((selection: Selection | null) => void)[] = [];
-
-  constructor() {
-    this.textModel = new TextModel();
-    this.smartSelector = new SmartSelector(this.textModel);
+    return this.createSelection(start, end, 'smart');
   }
 
   /**
-   * Initialize with visual text items
+   * Select all text
    */
-  initialize(visualItems: TextItem[]): void {
-    this.textModel.buildFromVisualItems(visualItems);
-    this.currentSelection = null;
+  selectAll(): Selection | null {
+    const text = this.textModel.getDocumentText();
+    if (text.length === 0) return null;
+    return this.createSelection(0, text.length, 'smart');
+  }
+
+  /**
+   * ADVANCED OPERATIONS FOR EXTERNAL SYSTEMS
+   */
+
+  /**
+   * Find text patterns and create selections
+   */
+  findText(pattern: string | RegExp, type: Selection['type'] = 'search'): Selection[] {
+    const text = this.textModel.getDocumentText();
+    const matches: Selection[] = [];
+
+    if (typeof pattern === 'string') {
+      let index = 0;
+      while ((index = text.indexOf(pattern, index)) !== -1) {
+        const selection = this.createSelection(index, index + pattern.length, type);
+        matches.push(selection);
+        index += pattern.length;
+      }
+    } else {
+      let match;
+      while ((match = pattern.exec(text)) !== null) {
+        const selection = this.createSelection(match.index, match.index + match[0].length, type);
+        matches.push(selection);
+        if (!pattern.global) break;
+      }
+    }
+
+    return matches;
+  }
+
+  /**
+   * Select text in coordinate region
+   */
+  selectInRegion(x1: number, y1: number, x2: number, y2: number): Selection[] {
+    const items = this.textModel.getItemsInRegion(x1, y1, x2, y2);
+    const selections: Selection[] = [];
+
+    if (items.length === 0) return selections;
+
+    // Group continuous character ranges
+    const ranges = items.map(item => ({ start: item.charStart, end: item.charEnd }))
+      .sort((a, b) => a.start - b.start);
+    
+    // Merge adjacent ranges
+    const merged = [];
+    for (const range of ranges) {
+      if (merged.length === 0 || merged[merged.length - 1].end < range.start) {
+        merged.push(range);
+      } else {
+        merged[merged.length - 1].end = Math.max(merged[merged.length - 1].end, range.end);
+      }
+    }
+
+    // Create selections for each merged range
+    for (const range of merged) {
+      const selection = this.createSelection(range.start, range.end, 'user');
+      selections.push(selection);
+    }
+
+    return selections;
+  }
+
+  /**
+   * Get overlapping selections
+   */
+  findOverlapping(start: number, end: number): Selection[] {
+    return Array.from(this.selections.values()).filter(sel =>
+      !(sel.end <= start || sel.start >= end) // Not disjoint = overlapping
+    );
+  }
+
+  /**
+   * Merge overlapping selections
+   */
+  mergeOverlapping(): void {
+    const selections = Array.from(this.selections.values()).sort((a, b) => a.start - b.start);
+    const merged: Selection[] = [];
+
+    for (const selection of selections) {
+      if (merged.length === 0 || merged[merged.length - 1].end < selection.start) {
+        merged.push({ ...selection });
+      } else {
+        const last = merged[merged.length - 1];
+        last.end = Math.max(last.end, selection.end);
+      }
+    }
+
+    // Replace with merged selections
+    this.selections.clear();
+    for (const selection of merged) {
+      this.selections.set(selection.id, selection);
+    }
     this.notifyListeners();
   }
 
   /**
-   * Convert screen coordinates to selection offset
+   * RENDERING SUPPORT (for UI systems)
    */
-  coordinatesToOffset(x: number, y: number): number | null {
-    return this.textModel.coordinatesToOffset(x, y);
+
+  /**
+   * Get selection bounds for rendering
+   */
+  getSelectionBounds(): SelectionBounds {
+    const allRects: SelectionBounds['rects'] = [];
+
+    for (const [id, selection] of this.selections) {
+      const rects = this.generateSelectionRects(selection);
+      allRects.push(...rects.map(rect => ({ ...rect, selectionId: id })));
+    }
+
+    return { rects: allRects };
   }
 
   /**
-   * Create manual selection range
+   * CHANGE NOTIFICATIONS
    */
-  selectRange(startOffset: number, endOffset: number): Selection {
-    const selection: Selection = {
-      startOffset: Math.min(startOffset, endOffset),
-      endOffset: Math.max(startOffset, endOffset),
-      type: 'manual'
-    };
-    this.setSelection(selection);
-    return selection;
-  }
-
-  /**
-   * Smart selection methods
-   */
-  selectWordAt(offset: number): Selection | null {
-    const selection = this.smartSelector.selectWordAt(offset);
-    this.setSelection(selection);
-    return selection;
-  }
-
-  selectSentenceAt(offset: number): Selection | null {
-    const selection = this.smartSelector.selectSentenceAt(offset);
-    this.setSelection(selection);
-    return selection;
-  }
-
-  selectLineAt(offset: number): Selection | null {
-    const selection = this.smartSelector.selectLineAt(offset);
-    this.setSelection(selection);
-    return selection;
-  }
-
-  selectClauseAt(offset: number): Selection | null {
-    const selection = this.smartSelector.selectClauseAt(offset);
-    this.setSelection(selection);
-    return selection;
-  }
-
-  selectSectionAt(offset: number): Selection | null {
-    const selection = this.smartSelector.selectSectionAt(offset);
-    this.setSelection(selection);
-    return selection;
-  }
-
-  selectAll(): Selection {
-    const selection = this.smartSelector.selectAll();
-    this.setSelection(selection);
-    return selection;
-  }
-
-  /**
-   * Get current selection
-   */
-  getSelection(): Selection | null {
-    return this.currentSelection;
-  }
-
-  /**
-   * Get selected text
-   */
-  getSelectedText(): string {
-    if (!this.currentSelection) return '';
-    return this.textModel.getSelectionText(this.currentSelection);
-  }
-
-  /**
-   * Get visual bounds for rendering
-   */
-  getSelectionBounds(): SelectionBounds | null {
-    if (!this.currentSelection) return null;
-    return this.textModel.getSelectionBounds(this.currentSelection);
-  }
-
-  /**
-   * Clear selection
-   */
-  clearSelection(): void {
-    this.setSelection(null);
-  }
 
   /**
    * Add selection change listener
    */
-  onSelectionChange(listener: (selection: Selection | null) => void): () => void {
+  onSelectionChange(listener: (selections: Map<string, Selection>) => void): () => void {
     this.listeners.push(listener);
     return () => {
       const index = this.listeners.indexOf(listener);
@@ -453,18 +367,51 @@ export class SelectionAPI {
     };
   }
 
-  private setSelection(selection: Selection | null): void {
-    this.currentSelection = selection;
-    this.notifyListeners();
-  }
-
   private notifyListeners(): void {
     for (const listener of this.listeners) {
       try {
-        listener(this.currentSelection);
+        listener(new Map(this.selections));
       } catch (error) {
         console.error('Error in selection change listener:', error);
       }
     }
+  }
+
+  private generateSelectionRects(selection: Selection): Array<{ x: number; y: number; width: number; height: number; }> {
+    const rects: Array<{ x: number; y: number; width: number; height: number; }> = [];
+    let currentRect: { x: number; y: number; width: number; height: number; } | null = null;
+    let lastItem: any = null;
+
+    for (let i = selection.start; i < selection.end; i++) {
+      const item = this.textModel.getItemAt(i);
+      if (!item) continue;
+
+      const charInItem = i - item.charStart;
+      const charWidth = item.width / item.str.length;
+      const charX = item.x + charInItem * charWidth;
+      const charY = item.y - item.height * 0.8;
+      const charHeight = item.height * 1.2;
+
+      // Try to extend current rectangle
+      if (currentRect && 
+          lastItem === item && 
+          Math.abs(currentRect.y - charY) < 2) {
+        currentRect.width = charX + charWidth - currentRect.x;
+      } else {
+        // Start new rectangle
+        if (currentRect) rects.push(currentRect);
+        currentRect = {
+          x: charX,
+          y: charY,
+          width: charWidth,
+          height: charHeight
+        };
+      }
+
+      lastItem = item;
+    }
+
+    if (currentRect) rects.push(currentRect);
+    return rects;
   }
 }
