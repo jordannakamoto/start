@@ -11,10 +11,32 @@ class PDFParseNode(Node):
     def exec(self, pdf_pages):
         parsed_content = []
         for page_num, content in pdf_pages.items():
+            # Improved paragraph splitting that handles various formats
+            content = content.strip()
+            
+            # First try splitting on double newlines
+            paragraphs = content.split('\n\n')
+            
+            # If that doesn't work well (very few paragraphs), try single newlines
+            if len(paragraphs) <= 1:
+                paragraphs = content.split('\n')
+            
+            # Clean and filter paragraphs
+            clean_paragraphs = []
+            for p in paragraphs:
+                p = p.strip()
+                # Skip very short paragraphs (likely artifacts)
+                if len(p) > 20:
+                    clean_paragraphs.append(p)
+            
+            # If still no good paragraphs, treat whole content as one paragraph
+            if not clean_paragraphs:
+                clean_paragraphs = [content]
+            
             parsed_content.append({
                 'page': page_num,
-                'content': content.strip(),
-                'paragraphs': [p.strip() for p in content.split('\n\n') if p.strip()]
+                'content': content,
+                'paragraphs': clean_paragraphs
             })
         return parsed_content
     
@@ -31,14 +53,28 @@ class CitationExtractionNode(Node):
         for page_data in parsed_pages:
             page_num = page_data['page']
             for para_idx, paragraph in enumerate(page_data['paragraphs']):
-                sentences = re.split(r'(?<=[.!?])\s+', paragraph)
-                for sent_idx, sentence in enumerate(sentences):
-                    if sentence.strip():
+                # Improved sentence splitting that handles more cases
+                # Split on sentence endings but avoid splitting on abbreviations
+                sentences = re.split(r'(?<=[.!?])\s+(?=[A-Z])', paragraph)
+                
+                # Further split long sentences that might have missed splits
+                final_sentences = []
+                for sentence in sentences:
+                    if len(sentence) > 300:  # Split very long sentences
+                        # Try to split on semicolons or conjunctions
+                        sub_sentences = re.split(r'(?<=;)\s+|(?<=,)\s+(?=(?:and|but|or|however|therefore|thus|moreover|furthermore)\s)', sentence)
+                        final_sentences.extend(sub_sentences)
+                    else:
+                        final_sentences.append(sentence)
+                
+                for sent_idx, sentence in enumerate(final_sentences):
+                    sentence = sentence.strip()
+                    if sentence and len(sentence) > 10:  # Only include substantial sentences
                         citation = {
                             'page': page_num,
                             'paragraph': para_idx + 1,
                             'sentence': sent_idx + 1,
-                            'text': sentence.strip(),
+                            'text': sentence,
                             'ref': f"p{page_num}.para{para_idx + 1}.s{sent_idx + 1}"
                         }
                         citations.append(citation)

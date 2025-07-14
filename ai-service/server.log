@@ -65,3 +65,268 @@ INFO:     127.0.0.1:64648 - "POST /resolve-citation HTTP/1.1" 200 OK
 INFO:     127.0.0.1:64652 - "POST /resolve-citation HTTP/1.1" 200 OK
 INFO:     127.0.0.1:64652 - "POST /resolve-citation HTTP/1.1" 200 OK
 INFO:     127.0.0.1:64652 - "POST /resolve-citation HTTP/1.1" 200 OK
+WARNING:  WatchFiles detected changes in 'services.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [4849]
+INFO:     Started server process [5251]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'test_pdf_summary.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [5251]
+INFO:     Started server process [5263]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'test_pdf_summary.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [5263]
+INFO:     Started server process [5316]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+/Users/jordannakamoto/start/ai-service/pocketflow.py:7: UserWarning: Overwriting successor for action 'default'
+  if action in self.successors: warnings.warn(f"Overwriting successor for action '{action}'")
+INFO:     127.0.0.1:64774 - "POST /ingest-pdf HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64774 - "POST /assistant-message HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64774 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64774 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64774 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64774 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64774 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64774 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64774 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64774 - "POST /resolve-citation HTTP/1.1" 200 OK
+/Users/jordannakamoto/start/ai-service/pocketflow.py:7: UserWarning: Overwriting successor for action 'default'
+  if action in self.successors: warnings.warn(f"Overwriting successor for action '{action}'")
+INFO:     127.0.0.1:64784 - "POST /ingest-pdf HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64784 - "POST /assistant-message HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64784 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64784 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64784 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64784 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64784 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64784 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64784 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64784 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64784 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64784 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64784 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64784 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64784 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64784 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64796 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64796 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64796 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64798 - "POST /assistant-message HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64798 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64798 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64798 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64798 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64798 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64798 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64798 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64798 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64798 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64798 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64798 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64798 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64798 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64798 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64888 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64888 - "POST /resolve-citation HTTP/1.1" 200 OK
+WARNING:  WatchFiles detected changes in 'services.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [5316]
+INFO:     Started server process [5808]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'services.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [5808]
+INFO:     Started server process [5818]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     127.0.0.1:64924 - "POST /assistant-message HTTP/1.1" 200 OK
+/Users/jordannakamoto/start/ai-service/pocketflow.py:7: UserWarning: Overwriting successor for action 'default'
+  if action in self.successors: warnings.warn(f"Overwriting successor for action '{action}'")
+INFO:     127.0.0.1:64928 - "POST /ingest-pdf HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64928 - "POST /assistant-message HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64928 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64928 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64928 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64928 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64928 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64928 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64928 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64928 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64928 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64928 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64928 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64928 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64928 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64928 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64931 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64931 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64931 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64931 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64931 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64931 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64931 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65017 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65053 - "OPTIONS /ingest-pdf HTTP/1.1" 200 OK
+/Users/jordannakamoto/start/ai-service/pocketflow.py:7: UserWarning: Overwriting successor for action 'default'
+  if action in self.successors: warnings.warn(f"Overwriting successor for action '{action}'")
+INFO:     127.0.0.1:65053 - "POST /ingest-pdf HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65053 - "OPTIONS /assistant-message HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65053 - "POST /assistant-message HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65053 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65053 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65053 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65053 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65053 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65053 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65053 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65053 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65053 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65053 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65053 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65053 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65053 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65053 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65053 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65056 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65081 - "POST /resolve-citation HTTP/1.1" 200 OK
+WARNING:  WatchFiles detected changes in 'services.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [5818]
+INFO:     Started server process [6075]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     127.0.0.1:65092 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65094 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65094 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65094 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65094 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65094 - "POST /resolve-citation HTTP/1.1" 200 OK
+/Users/jordannakamoto/start/ai-service/pocketflow.py:7: UserWarning: Overwriting successor for action 'default'
+  if action in self.successors: warnings.warn(f"Overwriting successor for action '{action}'")
+🔍 DEBUG: Received 1 pages
+🔍 DEBUG: Total characters: 9530
+🔍 DEBUG: Page 1: 9530 characters
+🔍 DEBUG: Page 1 preview: Sample Contract Contract No.___________ PROFESSIONAL SERVICES AGREEMENT THIS AGREEMENT made and ente...
+INFO:     127.0.0.1:65190 - "POST /ingest-pdf HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65304 - "OPTIONS /ingest-pdf HTTP/1.1" 200 OK
+/Users/jordannakamoto/start/ai-service/pocketflow.py:7: UserWarning: Overwriting successor for action 'default'
+  if action in self.successors: warnings.warn(f"Overwriting successor for action '{action}'")
+🔍 DEBUG: Received 1 pages
+🔍 DEBUG: Total characters: 9530
+🔍 DEBUG: Page 1: 9530 characters
+🔍 DEBUG: Page 1 preview: Sample Contract Contract No.___________ PROFESSIONAL SERVICES AGREEMENT THIS AGREEMENT made and ente...
+INFO:     127.0.0.1:65304 - "POST /ingest-pdf HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65304 - "OPTIONS /assistant-message HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65304 - "POST /assistant-message HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65304 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65304 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65304 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65304 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65304 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65304 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65304 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65304 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65304 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65304 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65304 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65304 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65304 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65304 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65304 - "POST /resolve-citation HTTP/1.1" 200 OK
+🔍 DEBUG: Received 1 pages
+🔍 DEBUG: Total characters: 31750
+🔍 DEBUG: Page 1: 31750 characters
+🔍 DEBUG: Page 1 preview: Sample Contract Contract No.___________ PROFESSIONAL SERVICES AGREEMENT THIS AGREEMENT made and ente...
+INFO:     127.0.0.1:65454 - "POST /ingest-pdf HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65454 - "POST /assistant-message HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65454 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65460 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65462 - "POST /assistant-message HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65462 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65462 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65462 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65462 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65462 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65462 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65462 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65462 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65462 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65462 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65462 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65462 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65462 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65462 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65462 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65462 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65462 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65462 - "POST /resolve-citation HTTP/1.1" 200 OK
+🔍 DEBUG: Received 1 pages
+🔍 DEBUG: Total characters: 31201
+🔍 DEBUG: Page 1: 31201 characters
+🔍 DEBUG: Page 1 preview: Sample ContractContract No.___________PROFESSIONAL SERVICES AGREEMENTTHIS AGREEMENT made and entered...
+INFO:     127.0.0.1:49259 - "POST /ingest-pdf HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49259 - "POST /assistant-message HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49259 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49259 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49259 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49259 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49259 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49259 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49259 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49259 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49259 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49259 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49259 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49259 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49259 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49259 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49259 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49259 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49259 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49259 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49259 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49259 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49259 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49265 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49267 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49269 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49271 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49273 - "POST /resolve-citation HTTP/1.1" 200 OK
+🔍 DEBUG: Received 1 pages
+🔍 DEBUG: Total characters: 31201
+🔍 DEBUG: Page 1: 31201 characters
+🔍 DEBUG: Page 1 preview: Sample ContractContract No.___________PROFESSIONAL SERVICES AGREEMENTTHIS AGREEMENT made and entered...
+INFO:     127.0.0.1:49277 - "POST /ingest-pdf HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49277 - "POST /assistant-message HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49277 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49277 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49277 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49277 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49277 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49277 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49277 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49277 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49277 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49277 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49277 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49280 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49282 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49288 - "POST /resolve-citation HTTP/1.1" 200 OK

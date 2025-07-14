@@ -26,6 +26,14 @@ async def ingest_pdf(request: PDFIngestRequest) -> dict:
     and returns processing results with job ID.
     """
     try:
+        # Debug logging
+        print(f"🔍 DEBUG: Received {len(request.pages)} pages")
+        total_chars = sum(len(content) for content in request.pages.values())
+        print(f"🔍 DEBUG: Total characters: {total_chars}")
+        for page_num, content in request.pages.items():
+            print(f"🔍 DEBUG: Page {page_num}: {len(content)} characters")
+            print(f"🔍 DEBUG: Page {page_num} preview: {content[:100]}...")
+        
         # Create unique PDF ID
         pages_str = str(sorted(request.pages.items()))
         pdf_content_hash = hashlib.md5(pages_str.encode()).hexdigest()[:16]
@@ -104,10 +112,50 @@ async def summarize_pdf_with_citations(pdf_id: str) -> dict:
                 "has_citations": False
             }
         
-        # Get all segments from the PDF for summarization
+        # Get segments from across the PDF for comprehensive summarization
         cache = search_store.pdf_caches[pdf_id]
+        all_segments = list(cache.semantic_index.segments.values())
+        
+        # Sort segments by page, paragraph, sentence for proper order
+        all_segments.sort(key=lambda s: (s.page, s.paragraph, s.sentence))
+        
+        # Select segments more intelligently:
+        # - Take more segments for longer documents
+        # - Distribute across all pages 
+        total_segments = len(all_segments)
+        max_segments = min(50, max(20, total_segments // 2))  # Between 20-50 segments
+        
+        # Try to get segments from each page
+        segments_by_page = {}
+        for segment in all_segments:
+            page = segment.page
+            if page not in segments_by_page:
+                segments_by_page[page] = []
+            segments_by_page[page].append(segment)
+        
+        # Select segments distributed across pages
+        selected_segments = []
+        segments_per_page = max(1, max_segments // len(segments_by_page))
+        
+        for page, page_segments in segments_by_page.items():
+            # Take up to segments_per_page from each page
+            selected_segments.extend(page_segments[:segments_per_page])
+        
+        # If we still have room, add more segments from the beginning
+        if len(selected_segments) < max_segments:
+            remaining = max_segments - len(selected_segments)
+            for segment in all_segments:
+                if segment not in selected_segments:
+                    selected_segments.append(segment)
+                    remaining -= 1
+                    if remaining <= 0:
+                        break
+        
+        # Sort selected segments back to proper order
+        selected_segments.sort(key=lambda s: (s.page, s.paragraph, s.sentence))
+        
         key_results = []
-        for segment in list(cache.semantic_index.segments.values())[:10]:  # Get first 10 segments
+        for segment in selected_segments:
             key_results.append({
                 'segment': {
                     'content': segment.content,
@@ -130,7 +178,10 @@ async def summarize_pdf_with_citations(pdf_id: str) -> dict:
         context_segments = []
         citations = []
         
-        for result in key_results[:10]:  # Limit to top 10 results
+        # Use more segments for better multipage coverage
+        max_segments_for_context = min(30, len(key_results))  # Use up to 30 segments
+        
+        for result in key_results[:max_segments_for_context]:
             segment = result['segment']
             context_segments.append(f"[{segment['reference']}]: {segment['content']}")
             citations.append(segment['reference'])
@@ -157,7 +208,7 @@ Instructions:
                     {"role": "system", "content": "You are an expert document summarizer. Always include citations in the exact format provided."},
                     {"role": "user", "content": prompt}
                 ],
-                max_tokens=1000,
+                max_tokens=2000,  # Increased for better multipage summaries
                 temperature=0.3
             )
             

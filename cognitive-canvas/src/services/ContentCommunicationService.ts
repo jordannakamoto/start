@@ -329,6 +329,11 @@ class ContentCommunicationService {
           const docText = pdfReader.text.getDocument();
           const docLength = pdfReader.text.getLength();
           
+          // Debug logging
+          console.log(`🔍 FRONTEND DEBUG: Document length: ${docLength} characters`);
+          console.log(`🔍 FRONTEND DEBUG: Document preview: ${docText.substring(0, 200)}...`);
+          console.log(`🔍 FRONTEND DEBUG: Document end: ...${docText.substring(docLength - 200)}`);
+          
           if (docLength === 0) {
             this.pdfIngestStatus.set(documentId, { status: 'failed', error: 'No text content' });
             return {
@@ -340,18 +345,23 @@ class ContentCommunicationService {
             };
           }
 
-          // Convert to page-based format (simulate pages every 2000 characters)
+          // Convert to page-based format (use larger chunks to preserve full document)
           const pages: Record<number, string> = {};
-          const pageSize = 2000;
+          const pageSize = 50000; // Increased from 2000 to 50000 characters per chunk
           let currentPage = 1;
           
           for (let i = 0; i < docLength; i += pageSize) {
             const pageText = docText.slice(i, Math.min(i + pageSize, docLength));
             if (pageText.trim().length > 0) {
               pages[currentPage] = pageText;
+              console.log(`🔍 FRONTEND DEBUG: Page ${currentPage}: ${pageText.length} characters`);
+              console.log(`🔍 FRONTEND DEBUG: Page ${currentPage} preview: ${pageText.substring(0, 100)}...`);
               currentPage++;
             }
           }
+          
+          console.log(`🔍 FRONTEND DEBUG: Total pages created: ${Object.keys(pages).length}`);
+          console.log(`🔍 FRONTEND DEBUG: Pages object:`, pages);
 
           // Send to AI service
           const result = await aiServiceClient.ingestPDF(pages);

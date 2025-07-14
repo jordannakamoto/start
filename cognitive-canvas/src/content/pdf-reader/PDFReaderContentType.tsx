@@ -52,6 +52,11 @@ const PDFDocumentViewer = memo(({ pages, scale, documentId }: { pages: pdfjsLib.
   const visiblePagesRef = useRef<VisiblePage[]>([]);
   const selectionPagesRef = useRef<VisiblePage[]>([]);
   const prerenderedTextRef = useRef<Map<number, any[]>>(new Map());
+  
+  // Separate full-document text store for AI inference
+  const fullDocumentTextRef = useRef<string>('');
+  const fullDocumentTextItemsRef = useRef<any[]>([]);
+  
   const scrollUpdateRef = useRef<number | null>(null);
   const selectionUpdateRef = useRef<number | null>(null);
   const [selection, setSelection] = useState<Selection | null>(null);
@@ -93,6 +98,53 @@ const PDFDocumentViewer = memo(({ pages, scale, documentId }: { pages: pdfjsLib.
     
     return visible;
   }, [pages, scale]);
+
+  // Build full document text store for AI inference
+  const buildFullDocumentTextStore = useCallback((textMap: Map<number, any[]>, pagesInfo: PageInfo[]) => {
+    const allTextItems: any[] = [];
+    let fullDocumentText = '';
+    
+    // Process all pages in order
+    for (let pageIndex = 0; pageIndex < pages.length; pageIndex++) {
+      const pageTextItems = textMap.get(pageIndex);
+      if (!pageTextItems) continue;
+      
+      const pageInfo = pagesInfo[pageIndex];
+      if (!pageInfo) continue;
+      
+      // Sort text items by reading order (Y then X)
+      const sortedItems = pageTextItems.slice().sort((a, b) => {
+        const yDiff = a.y - b.y;
+        return Math.abs(yDiff) > 3 ? yDiff : a.x - b.x;
+      });
+      
+      // Build text for this page
+      let pageText = '';
+      for (const item of sortedItems) {
+        pageText += item.str;
+        
+        // Add to full document items with absolute positioning
+        allTextItems.push({
+          ...item,
+          absoluteY: item.y + pageInfo.offsetY,
+          globalCharIndex: fullDocumentText.length + pageText.length - item.str.length
+        });
+      }
+      
+      // Add page break between pages (except for last page)
+      if (pageIndex < pages.length - 1) {
+        pageText += '\n\n';
+      }
+      
+      fullDocumentText += pageText;
+    }
+    
+    // Store the full document text and items
+    fullDocumentTextRef.current = fullDocumentText;
+    fullDocumentTextItemsRef.current = allTextItems;
+    
+    console.log(`🔍 PDF Reader: Built full document text store with ${fullDocumentText.length} characters from ${pages.length} pages`);
+  }, [pages]);
 
   // Calculate pages for selection model (larger buffer for continuity)
   const calculateSelectionPages = useCallback((scrollTop: number, containerHeight: number): VisiblePage[] => {
@@ -286,11 +338,11 @@ const PDFDocumentViewer = memo(({ pages, scale, documentId }: { pages: pdfjsLib.
         fastSelectionRef.current.coordsToChar(x, y, anchorX, anchorY),
       text: {
         getDocument: () => 
-          fastSelectionRef.current.getTextModel().getDocumentText(),
+          fullDocumentTextRef.current,
         getText: (start: number, end: number) => 
-          fastSelectionRef.current.getTextModel().getText(start, end),
+          fullDocumentTextRef.current.slice(start, end),
         getLength: () => 
-          fastSelectionRef.current.getTextModel().getLength(),
+          fullDocumentTextRef.current.length,
         getPages: () => 
           fastSelectionRef.current.getTextModel().getPages()
       }
@@ -384,6 +436,9 @@ const PDFDocumentViewer = memo(({ pages, scale, documentId }: { pages: pdfjsLib.
       setTotalHeight(docTotalHeight);
       setMaxWidth(docMaxWidth);
       
+      // Build full document text store for AI inference
+      buildFullDocumentTextStore(textMap, pagesInfo);
+      
       // Initial visible pages calculation
       if (containerRef.current) {
         const containerHeight = containerRef.current.clientHeight;
@@ -441,7 +496,7 @@ const PDFDocumentViewer = memo(({ pages, scale, documentId }: { pages: pdfjsLib.
       // Build rendering items from visible pages only
       const textItemsForRendering: any[] = [];
 
-      // Process selection pages for FastSelection model
+      // Process selection pages for FastSelection model (visible window only)
       for (const selectionPage of selectionPages) {
         const { pageIndex, viewport, offsetY } = selectionPage;
         const pageTextItems = prerenderedTextRef.current.get(pageIndex);
