@@ -29,7 +29,9 @@
       "Bash(src-tauri/target/release/cognitive-canvas)",
       "Bash(./src-tauri/target/release/cognitive-canvas)",
       "Bash(cp:*)",
-      "Bash(npx vite:*)"
+      "Bash(npx vite:*)",
+      "WebFetch(domain:medium.com)",
+      "WebFetch(domain:github.com)"
     ],
     "deny": []
   }
