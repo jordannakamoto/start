@@ -2,8 +2,10 @@
 // Direct canvas rendering with custom text layer for perfect alignment
 
 import * as pdfjsLib from 'pdfjs-dist';
-import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+
 import { ContentEditorProps, ContentTypeDefinition } from '../types';
+import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+
 import { FastSelection } from './FastSelection';
 import { Selection } from './SelectionAPI';
 import { SelectionEventHandler } from './SelectionEventHandler';
@@ -147,6 +149,14 @@ const PDFDocumentViewer = memo(({ pages, scale }: { pages: pdfjsLib.PDFPageProxy
       console.log('Pre-rendering text for all pages...');
       const textMap = new Map<number, any[]>();
       
+      // Create measurement canvas for pre-calculating text widths
+      const measurementCanvas = document.createElement('canvas');
+      const measurementCtx = measurementCanvas.getContext('2d');
+      if (!measurementCtx) {
+        console.error("Failed to create measurement context");
+        return;
+      }
+      
       // Calculate document dimensions and page positions
       let docTotalHeight = 0;
       let docMaxWidth = 0;
@@ -173,15 +183,20 @@ const PDFDocumentViewer = memo(({ pages, scale }: { pages: pdfjsLib.PDFPageProxy
             const fontSize = Math.abs(a) * scale;
             const x = e * scale;
             const y = viewport.height - f * scale;
+            const fontFamily = item.fontName || 'serif';
+            
+            // Pre-calculate text width
+            measurementCtx.font = `${fontSize}px ${fontFamily}`;
+            const measuredWidth = measurementCtx.measureText(item.str).width;
             
             pageTextItems.push({
               str: item.str,
               x,
               y,
-              width: 0, // Will be calculated during render
+              width: measuredWidth, // Use the pre-calculated width
               height: fontSize,
               fontSize,
-              fontFamily: item.fontName || 'serif',
+              fontFamily,
               pageIndex,
               globalCharIndex: 0 // Will be set during SelectionAPI initialization
             });
