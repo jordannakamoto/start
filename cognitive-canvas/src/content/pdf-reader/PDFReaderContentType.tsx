@@ -362,7 +362,7 @@ const PDFDocumentViewer = memo(({ pages, scale }: { pages: pdfjsLib.PDFPageProxy
   // Render visible pages only
   useEffect(() => {
     const renderVisiblePages = async () => {
-      if (!textCanvasRef.current || !selectionCanvasRef.current || visiblePages.length === 0) return;
+      if (!textCanvasRef.current || !selectionCanvasRef.current || visiblePages.length === 0 || !containerRef.current) return;
 
       const textCanvas = textCanvasRef.current;
       const selectionCanvas = selectionCanvasRef.current;
@@ -371,18 +371,20 @@ const PDFDocumentViewer = memo(({ pages, scale }: { pages: pdfjsLib.PDFPageProxy
       
       if (!textCtx || !selectionCtx) return;
 
-      // Set canvas to container size for virtualized rendering
-      const containerHeight = containerRef.current?.clientHeight || 800;
+      // Get container dimensions for proper centering
+      const containerWidth = containerRef.current.clientWidth;
+      const containerHeight = containerRef.current.clientHeight;
       const devicePixelRatio = window.devicePixelRatio || 1;
       
-      textCanvas.width = maxWidth * devicePixelRatio;
+      // Canvas should fill the container width for proper centering
+      textCanvas.width = containerWidth * devicePixelRatio;
       textCanvas.height = containerHeight * devicePixelRatio;
-      textCanvas.style.width = `${maxWidth}px`;
+      textCanvas.style.width = `${containerWidth}px`;
       textCanvas.style.height = `${containerHeight}px`;
       
-      selectionCanvas.width = maxWidth * devicePixelRatio;
+      selectionCanvas.width = containerWidth * devicePixelRatio;
       selectionCanvas.height = containerHeight * devicePixelRatio;
-      selectionCanvas.style.width = `${maxWidth}px`;
+      selectionCanvas.style.width = `${containerWidth}px`;
       selectionCanvas.style.height = `${containerHeight}px`;
       
       textCtx.scale(devicePixelRatio, devicePixelRatio);
@@ -391,7 +393,10 @@ const PDFDocumentViewer = memo(({ pages, scale }: { pages: pdfjsLib.PDFPageProxy
 
       // Clear canvas
       textCtx.fillStyle = 'white';
-      textCtx.fillRect(0, 0, maxWidth, containerHeight);
+      textCtx.fillRect(0, 0, containerWidth, containerHeight);
+
+      // Calculate horizontal centering offset
+      const pageHorizontalOffset = (containerWidth - maxWidth) / 2;
 
       // Get scroll offset for coordinate transformation
       const scrollTop = containerRef.current?.scrollTop || 0;
@@ -410,7 +415,8 @@ const PDFDocumentViewer = memo(({ pages, scale }: { pages: pdfjsLib.PDFPageProxy
           if (item.str.trim()) {
             const [a, , , , e, f] = item.transform;
             const fontSize = Math.abs(a) * scale;
-            const x = e * scale + (maxWidth - viewport.width) / 2; // Center page horizontally
+            // Center the page within the container, then position text within the page
+            const x = e * scale + (maxWidth - viewport.width) / 2 + pageHorizontalOffset;
             const y = (viewport.height - f * scale) + offsetY - scrollTop; // Adjust for scroll
             
             // Only process if within visible area
@@ -434,15 +440,15 @@ const PDFDocumentViewer = memo(({ pages, scale }: { pages: pdfjsLib.PDFPageProxy
           }
         });
 
-        // Draw page separator line (subtle) - adjust for scroll
+        // Draw page separator line (subtle) - adjust for scroll and centering
         if (pageIndex > 0) {
           const separatorY = offsetY - scrollTop;
           if (separatorY > 0 && separatorY < containerHeight) {
             textCtx.strokeStyle = '#e0e0e0';
             textCtx.lineWidth = 1;
             textCtx.beginPath();
-            textCtx.moveTo(0, separatorY);
-            textCtx.lineTo(maxWidth, separatorY);
+            textCtx.moveTo(pageHorizontalOffset, separatorY);
+            textCtx.lineTo(pageHorizontalOffset + maxWidth, separatorY);
             textCtx.stroke();
           }
         }
@@ -521,29 +527,27 @@ const PDFDocumentViewer = memo(({ pages, scale }: { pages: pdfjsLib.PDFPageProxy
       {/* Invisible scroll spacer to create proper scroll height */}
       <div style={{ height: totalHeight, width: 1, position: 'absolute', left: 0, top: 0, pointerEvents: 'none' }} />
       
-      {/* Fixed canvas container centered in viewport */}
+      {/* Fixed canvas container that fills the viewport */}
       <div 
-        className="sticky top-0 left-0 flex justify-center"
+        className="sticky top-0 left-0 w-full"
         style={{ height: '100vh', pointerEvents: 'none' }}
       >
-        <div className="relative shadow-lg bg-white" style={{ pointerEvents: 'auto' }}>
-          {/* Text layer - virtualized, only shows visible pages */}
-          <canvas
-            ref={textCanvasRef}
-            className="block"
-            style={{ position: 'absolute', top: 0, left: 0 }}
-          />
-          {/* Selection layer - transparent overlay */}
-          <canvas
-            ref={selectionCanvasRef}
-            className="block cursor-text"
-            style={{ position: 'absolute', top: 0, left: 0 }}
-            onMouseDown={handleMouseDown}
-            onMouseMove={handleMouseMove}
-            onMouseUp={handleMouseUp}
-            onMouseLeave={handleMouseUp}
-          />
-        </div>
+        {/* Text layer - virtualized, only shows visible pages */}
+        <canvas
+          ref={textCanvasRef}
+          className="block"
+          style={{ position: 'absolute', top: 0, left: 0, pointerEvents: 'auto' }}
+        />
+        {/* Selection layer - transparent overlay */}
+        <canvas
+          ref={selectionCanvasRef}
+          className="block cursor-text"
+          style={{ position: 'absolute', top: 0, left: 0, pointerEvents: 'auto' }}
+          onMouseDown={handleMouseDown}
+          onMouseMove={handleMouseMove}
+          onMouseUp={handleMouseUp}
+          onMouseLeave={handleMouseUp}
+        />
       </div>
 
       {/* Page indicator */}
