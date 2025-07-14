@@ -1,0 +1,120 @@
+INFO:     Will watch for changes in these directories: ['/Users/jordannakamoto/start/ai-service']
+INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
+INFO:     Started reloader process [85273] using WatchFiles
+INFO:     Started server process [85276]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+/Users/jordannakamoto/start/ai-service/pocketflow.py:7: UserWarning: Overwriting successor for action 'default'
+  if action in self.successors: warnings.warn(f"Overwriting successor for action '{action}'")
+INFO:     127.0.0.1:63400 - "POST /ingest-pdf HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63422 - "POST /ingest-pdf HTTP/1.1" 200 OK
+WARNING:  WatchFiles detected changes in 'integrated_pdf_flow.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [85276]
+INFO:     Started server process [87058]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'background_processors.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [87058]
+INFO:     Started server process [87067]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'background_processors.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [87067]
+INFO:     Started server process [87076]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+/Users/jordannakamoto/start/ai-service/pocketflow.py:7: UserWarning: Overwriting successor for action 'default'
+  if action in self.successors: warnings.warn(f"Overwriting successor for action '{action}'")
+INFO:     127.0.0.1:63510 - "POST /ingest-pdf HTTP/1.1" 200 OK
+WARNING:  WatchFiles detected changes in 'integrated_pdf_flow.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [87076]
+INFO:     Started server process [87605]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'background_processors.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [87605]
+INFO:     Started server process [87616]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+/Users/jordannakamoto/start/ai-service/pocketflow.py:7: UserWarning: Overwriting successor for action 'default'
+  if action in self.successors: warnings.warn(f"Overwriting successor for action '{action}'")
+INFO:     127.0.0.1:63565 - "POST /ingest-pdf HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63592 - "POST /ingest-pdf HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63609 - "POST /assistant-message HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63628 - "OPTIONS /ingest-pdf HTTP/1.1" 200 OK
+/Users/jordannakamoto/start/ai-service/pocketflow.py:7: UserWarning: Overwriting successor for action 'default'
+  if action in self.successors: warnings.warn(f"Overwriting successor for action '{action}'")
+INFO:     127.0.0.1:63628 - "POST /ingest-pdf HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63628 - "OPTIONS /assistant-message HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63628 - "POST /assistant-message HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63628 - "POST /resolve-citation HTTP/1.1" 422 Unprocessable Content
+INFO:     127.0.0.1:63628 - "POST /resolve-citation HTTP/1.1" 422 Unprocessable Content
+INFO:     127.0.0.1:63628 - "POST /resolve-citation HTTP/1.1" 422 Unprocessable Content
+INFO:     127.0.0.1:63628 - "POST /resolve-citation HTTP/1.1" 422 Unprocessable Content
+INFO:     127.0.0.1:63628 - "POST /resolve-citation HTTP/1.1" 422 Unprocessable Content
+INFO:     127.0.0.1:63628 - "POST /resolve-citation HTTP/1.1" 422 Unprocessable Content
+WARNING:  WatchFiles detected changes in 'models.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [87616]
+INFO:     Started server process [88991]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'main.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [88991]
+INFO:     Started server process [88998]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'main.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [88998]
+INFO:     Started server process [89005]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     127.0.0.1:63688 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63702 - "POST /search-pdf HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:63719 - "POST /api/search/search HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:63740 - "POST /api/search/query HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63848 - "POST /assistant-message HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63861 - "POST /assistant-message HTTP/1.1" 200 OK
+/Users/jordannakamoto/start/ai-service/pocketflow.py:7: UserWarning: Overwriting successor for action 'default'
+  if action in self.successors: warnings.warn(f"Overwriting successor for action '{action}'")
+INFO:     127.0.0.1:63879 - "POST /ingest-pdf HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63879 - "POST /assistant-message HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63879 - "POST /resolve-citation HTTP/1.1" 422 Unprocessable Content
+INFO:     127.0.0.1:63879 - "POST /resolve-citation HTTP/1.1" 422 Unprocessable Content
+/Users/jordannakamoto/start/ai-service/pocketflow.py:7: UserWarning: Overwriting successor for action 'default'
+  if action in self.successors: warnings.warn(f"Overwriting successor for action '{action}'")
+INFO:     127.0.0.1:63886 - "POST /ingest-pdf HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63899 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63915 - "POST /api/search/query HTTP/1.1" 200 OK
+WARNING:  WatchFiles detected changes in 'services.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [89005]
+INFO:     Started server process [95620]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     127.0.0.1:63960 - "POST /resolve-citation HTTP/1.1" 200 OK

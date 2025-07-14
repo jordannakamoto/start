@@ -9,7 +9,8 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { pdfHighlight } from '../../services/ContentCommunicationService';
+import { pdfHighlight, aiService } from '../../services/ContentCommunicationService';
+import { CitationParser } from '../../services/AIServiceClient';
 
 // --- Reusable Icon Components for a cleaner look ---
 const BotIcon = (props: React.SVGProps<SVGSVGElement>) => (
@@ -36,6 +37,8 @@ interface Message {
   role: 'user' | 'assistant';
   content: string;
   timestamp: number;
+  citations?: string[];
+  hasCitations?: boolean;
 }
 
 interface ChatState {
@@ -97,8 +100,15 @@ function AIAssistantEditor({ documentId, content, onContentChange }: ContentEdit
   }, [inputValue]);
 
 
-  const addMessage = useCallback((role: 'user' | 'assistant', messageContent: string) => {
-    const newMessage: Message = { id: `msg_${Date.now()}`, role, content: messageContent, timestamp: Date.now() };
+  const addMessage = useCallback((role: 'user' | 'assistant', messageContent: string, citations?: string[]) => {
+    const newMessage: Message = { 
+      id: `msg_${Date.now()}`, 
+      role, 
+      content: messageContent, 
+      timestamp: Date.now(),
+      citations,
+      hasCitations: citations && citations.length > 0
+    };
     setChatState(prev => ({ ...prev, messages: [...prev.messages, newMessage] }));
   }, []);
 
@@ -123,6 +133,75 @@ function AIAssistantEditor({ documentId, content, onContentChange }: ContentEdit
       handleSendMessage();
     }
   };
+
+  // Handle citation click - navigate to citation in PDF
+  const handleCitationClick = useCallback(async (citation: string) => {
+    try {
+      const documents = pdfHighlight.getDocuments();
+      if (documents.length === 0) {
+        addMessage('assistant', 'No PDF documents are currently open to navigate to.');
+        return;
+      }
+
+      const document = documents[0]; // Use first available document
+      const result = await aiService.navigateToCitation(document.documentId, citation);
+      
+      if (result?.payload.success) {
+        addMessage('assistant', `✅ Navigated to citation ${citation} in the PDF.`);
+      } else {
+        addMessage('assistant', `❌ Could not navigate to citation ${citation}: ${result?.payload.error || 'Unknown error'}`);
+      }
+    } catch (error) {
+      addMessage('assistant', `❌ Error navigating to citation: ${error}`);
+    }
+  }, [addMessage]);
+
+  // Summarize PDF functionality
+  const handleSummarizePDF = useCallback(async () => {
+    try {
+      const documents = pdfHighlight.getDocuments();
+      if (documents.length === 0) {
+        addMessage('assistant', 'No PDF documents are currently open. Please open a PDF document first.');
+        return;
+      }
+
+      const document = documents.find(doc => doc.hasContent);
+      if (!document) {
+        addMessage('assistant', 'Found PDF documents but they have no text content loaded yet.');
+        return;
+      }
+
+      addMessage('user', 'Summarize this PDF');
+      setChatState(prev => ({ ...prev, isTyping: true }));
+
+      try {
+        const summary = await aiService.summarizePDF(document.documentId);
+        
+        if (summary.has_citations) {
+          // Extract citations from response
+          const citations = CitationParser.extractCitations(summary.response);
+          
+          // Add AI summary with citations
+          setChatState(prev => ({ ...prev, isTyping: false }));
+          addMessage('assistant', summary.response, citations);
+          
+          // Highlight citations in PDF
+          if (citations.length > 0) {
+            await aiService.highlightCitations(document.documentId, citations);
+          }
+        } else {
+          setChatState(prev => ({ ...prev, isTyping: false }));
+          addMessage('assistant', summary.response);
+        }
+      } catch (error) {
+        setChatState(prev => ({ ...prev, isTyping: false }));
+        addMessage('assistant', `❌ Error summarizing PDF: ${error}`);
+      }
+    } catch (error) {
+      setChatState(prev => ({ ...prev, isTyping: false }));
+      addMessage('assistant', `❌ Error accessing PDF: ${error}`);
+    }
+  }, [addMessage]);
 
   // Test function to demonstrate highlight API
   const testHighlightAPI = useCallback(async () => {
@@ -205,6 +284,39 @@ The highlight API is ready, but needs an active PDF document to demonstrate on.
     }
   }, [addMessage]);
 
+  // Render message content with clickable citations
+  const renderMessageContent = useCallback((message: Message) => {
+    if (!message.hasCitations) {
+      return <p className="whitespace-pre-wrap">{message.content}</p>;
+    }
+
+    const parts = CitationParser.replaceCitationsWithCallback(
+      message.content,
+      handleCitationClick
+    );
+
+    return (
+      <div className="whitespace-pre-wrap">
+        {parts.map((part, index) => {
+          if (typeof part === 'string') {
+            return <span key={index}>{part}</span>;
+          } else {
+            return (
+              <button
+                key={index}
+                onClick={part.onClick}
+                className="text-blue-600 hover:text-blue-800 underline bg-blue-50 hover:bg-blue-100 px-1 py-0.5 rounded text-sm transition-colors"
+                title={`Navigate to ${part.citation}`}
+              >
+                {part.citation}
+              </button>
+            );
+          }
+        })}
+      </div>
+    );
+  }, [handleCitationClick]);
+
   return (
     <Card className="h-full flex flex-col w-full !rounded-none !border-0">
       <CardHeader className="flex flex-row items-center justify-between border-b">
@@ -215,15 +327,28 @@ The highlight API is ready, but needs an active PDF document to demonstrate on.
           </div>
         </div>
         
-        {/* Test highlight button */}
-        <Button
-          onClick={testHighlightAPI}
-          variant="outline"
-          size="sm"
-          className="text-xs"
-        >
-          🖍️ Test Highlight API
-        </Button>
+        <div className="flex space-x-2">
+          {/* Summarize PDF button */}
+          <Button
+            onClick={handleSummarizePDF}
+            variant="default"
+            size="sm"
+            className="text-xs"
+            disabled={chatState.isTyping}
+          >
+            📄 Summarize PDF
+          </Button>
+          
+          {/* Test highlight button */}
+          <Button
+            onClick={testHighlightAPI}
+            variant="outline"
+            size="sm"
+            className="text-xs"
+          >
+            🖍️ Test Highlight API
+          </Button>
+        </div>
       </CardHeader>
       
       <CardContent className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6">
@@ -245,7 +370,7 @@ The highlight API is ready, but needs an active PDF document to demonstrate on.
               )}
                <div className={`group flex flex-col gap-1 max-w-[85%] ${message.role === 'user' ? 'items-end' : ''}`}>
                   <div className={`px-4 py-2.5 rounded-lg text-sm ${ message.role === 'user' ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>
-                    <p className="whitespace-pre-wrap">{message.content}</p>
+                    {renderMessageContent(message)}
                   </div>
                   <p className="text-xs text-muted-foreground">
                     {new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}

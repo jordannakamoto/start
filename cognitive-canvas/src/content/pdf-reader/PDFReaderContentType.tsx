@@ -232,11 +232,8 @@ const PDFDocumentViewer = memo(({ pages, scale, documentId }: { pages: pdfjsLib.
 
     // Setup highlight change listener
     const highlightAPI = fastSelectionRef.current.getHighlightAPI();
-    const unsubscribeHighlights = highlightAPI.onHighlightChange((event) => {
-      console.log('Highlight change event:', event);
-      const allHighlights = highlightAPI.getAllHighlights();
-      console.log('Setting highlights state:', allHighlights);
-      setHighlights(allHighlights);
+    const unsubscribeHighlights = highlightAPI.onHighlightChange(() => {
+      setHighlights(highlightAPI.getAllHighlights());
     });
 
     // Register PDF reader with communication service
@@ -536,36 +533,17 @@ const PDFDocumentViewer = memo(({ pages, scale, documentId }: { pages: pdfjsLib.
 
   // Separate effect for highlight rendering (performance optimized)
   useEffect(() => {
-    console.log('Highlight rendering effect triggered:', {
-      highlightsCount: highlights.length,
-      highlights: highlights,
-      visiblePagesCount: visiblePages.length,
-      scrollPosition
-    });
-
     const renderHighlights = () => {
-      if (!highlightCanvasRef.current || !containerRef.current) {
-        console.log('Missing highlight canvas or container ref');
-        return;
-      }
+      if (!highlightCanvasRef.current || !containerRef.current) return;
 
       const highlightCanvas = highlightCanvasRef.current;
       const highlightCtx = highlightCanvas.getContext('2d');
-      if (!highlightCtx) {
-        console.log('Could not get highlight canvas context');
-        return;
-      }
+      if (!highlightCtx) return;
 
       // Get container dimensions
       const containerWidth = containerRef.current.clientWidth;
       const containerHeight = containerRef.current.clientHeight;
       const devicePixelRatio = window.devicePixelRatio || 1;
-      
-      console.log('Setting up highlight canvas:', {
-        containerWidth,
-        containerHeight,
-        devicePixelRatio
-      });
       
       // Setup highlight canvas to match text canvas exactly
       highlightCanvas.width = containerWidth * devicePixelRatio;
@@ -577,12 +555,9 @@ const PDFDocumentViewer = memo(({ pages, scale, documentId }: { pages: pdfjsLib.
 
       // Clear highlight canvas
       highlightCtx.clearRect(0, 0, containerWidth, containerHeight);
-      console.log('Cleared highlight canvas');
 
       // Render highlights
-      console.log('About to draw highlights...');
       drawHighlights(highlightCtx);
-      console.log('Finished drawing highlights');
     };
 
     renderHighlights();

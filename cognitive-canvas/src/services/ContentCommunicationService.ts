@@ -3,6 +3,7 @@
 
 import { createPDFReaderInstance, type PDFReaderInstance } from '../content/pdf-reader';
 import { HIGHLIGHT_COLORS } from '../content/pdf-reader/HighlightAPI';
+import { aiServiceClient, CitationParser, type PDFIngestResult, type AssistantMessageResponse, type CitationResolution } from './AIServiceClient';
 
 export type ContentCommunicationEvent = 
   | { type: 'pdf-highlight-test'; payload: { documentId: string } }
@@ -10,11 +11,18 @@ export type ContentCommunicationEvent =
   | { type: 'pdf-highlight-find'; payload: { documentId: string; pattern: string | RegExp; options?: any } }
   | { type: 'pdf-highlight-export'; payload: { documentId: string } }
   | { type: 'pdf-highlight-clear'; payload: { documentId: string } }
-  | { type: 'pdf-get-stats'; payload: { documentId: string } };
+  | { type: 'pdf-get-stats'; payload: { documentId: string } }
+  | { type: 'ai-ingest-pdf'; payload: { documentId: string } }
+  | { type: 'ai-highlight-citations'; payload: { documentId: string; citations: string[] } }
+  | { type: 'ai-navigate-citation'; payload: { documentId: string; citation: string } }
+  | { type: 'ai-resolve-citation'; payload: { documentId: string; citation: string } };
 
 export type ContentCommunicationResponse = 
   | { type: 'pdf-highlight-result'; payload: { success: boolean; data?: any; error?: string } }
-  | { type: 'pdf-stats-result'; payload: { stats: any } };
+  | { type: 'pdf-stats-result'; payload: { stats: any } }
+  | { type: 'ai-ingest-result'; payload: { success: boolean; data?: PDFIngestResult; error?: string } }
+  | { type: 'ai-citation-result'; payload: { success: boolean; data?: CitationResolution; error?: string } }
+  | { type: 'ai-highlight-result'; payload: { success: boolean; data?: any; error?: string } };
 
 type EventListener = (event: ContentCommunicationEvent) => Promise<ContentCommunicationResponse | void>;
 
@@ -25,6 +33,7 @@ class ContentCommunicationService {
   private static instance: ContentCommunicationService;
   private listeners: Map<string, EventListener[]> = new Map();
   private pdfReaderInstances: Map<string, PDFReaderInstance> = new Map();
+  private pdfIngestStatus: Map<string, { status: 'pending' | 'completed' | 'failed'; pdfId?: string; error?: string }> = new Map();
 
   private constructor() {}
 
@@ -75,6 +84,11 @@ class ContentCommunicationService {
     // Handle PDF-specific events
     if (eventType.startsWith('pdf-')) {
       return this.handlePDFEvent(event);
+    }
+
+    // Handle AI-specific events
+    if (eventType.startsWith('ai-')) {
+      return this.handleAIEvent(event);
     }
 
     // Handle other events via listeners
@@ -272,6 +286,264 @@ class ContentCommunicationService {
   }
 
   /**
+   * Handle AI-specific events
+   */
+  private async handleAIEvent(event: ContentCommunicationEvent): Promise<ContentCommunicationResponse> {
+    const { payload } = event;
+    const documentId = payload.documentId;
+    const pdfReader = this.getPDFReader(documentId);
+
+    if (!pdfReader) {
+      return {
+        type: 'ai-ingest-result',
+        payload: {
+          success: false,
+          error: `No PDF reader found for document: ${documentId}`
+        }
+      };
+    }
+
+    try {
+      switch (event.type) {
+        case 'ai-ingest-pdf': {
+          // Check if already ingested
+          const existingStatus = this.pdfIngestStatus.get(documentId);
+          if (existingStatus && existingStatus.status === 'completed') {
+            return {
+              type: 'ai-ingest-result',
+              payload: {
+                success: true,
+                data: {
+                  job_id: existingStatus.pdfId,
+                  status: 'completed',
+                  message: 'PDF already ingested'
+                } as PDFIngestResult
+              }
+            };
+          }
+
+          // Mark as pending
+          this.pdfIngestStatus.set(documentId, { status: 'pending' });
+
+          // Extract text from PDF
+          const docText = pdfReader.text.getDocument();
+          const docLength = pdfReader.text.getLength();
+          
+          if (docLength === 0) {
+            this.pdfIngestStatus.set(documentId, { status: 'failed', error: 'No text content' });
+            return {
+              type: 'ai-ingest-result',
+              payload: {
+                success: false,
+                error: 'Document has no text content to ingest'
+              }
+            };
+          }
+
+          // Convert to page-based format (simulate pages every 2000 characters)
+          const pages: Record<number, string> = {};
+          const pageSize = 2000;
+          let currentPage = 1;
+          
+          for (let i = 0; i < docLength; i += pageSize) {
+            const pageText = docText.slice(i, Math.min(i + pageSize, docLength));
+            if (pageText.trim().length > 0) {
+              pages[currentPage] = pageText;
+              currentPage++;
+            }
+          }
+
+          // Send to AI service
+          const result = await aiServiceClient.ingestPDF(pages);
+          
+          if (result.status === 'completed') {
+            this.pdfIngestStatus.set(documentId, { status: 'completed', pdfId: result.job_id });
+          } else {
+            this.pdfIngestStatus.set(documentId, { status: 'failed', error: result.error });
+          }
+
+          return {
+            type: 'ai-ingest-result',
+            payload: {
+              success: result.status === 'completed',
+              data: result,
+              error: result.error
+            }
+          };
+        }
+
+        case 'ai-highlight-citations': {
+          const { citations } = payload as any;
+          const ingestStatus = this.pdfIngestStatus.get(documentId);
+          
+          if (!ingestStatus || ingestStatus.status !== 'completed') {
+            return {
+              type: 'ai-highlight-result',
+              payload: {
+                success: false,
+                error: 'PDF not ingested. Please ingest PDF first.'
+              }
+            };
+          }
+
+          const highlightResults = [];
+          const errors = [];
+
+          for (const citation of citations) {
+            try {
+              // Resolve citation to get content
+              const resolution = await aiServiceClient.resolveCitation(ingestStatus.pdfId!, citation);
+              
+              if (resolution.found && resolution.content) {
+                // Find the content in the PDF
+                const docText = pdfReader.text.getDocument();
+                const contentIndex = docText.indexOf(resolution.content);
+                
+                if (contentIndex >= 0) {
+                  const start = contentIndex;
+                  const end = start + resolution.content.length;
+                  
+                  const highlight = pdfReader.highlight.addByRange(start, end, {
+                    color: HIGHLIGHT_COLORS.BLUE,
+                    note: `Citation: ${citation}`
+                  });
+                  
+                  highlightResults.push({
+                    citation,
+                    highlight,
+                    resolved: resolution
+                  });
+                } else {
+                  errors.push(`Content not found in PDF for citation: ${citation}`);
+                }
+              } else {
+                errors.push(`Citation could not be resolved: ${citation}`);
+              }
+            } catch (error) {
+              errors.push(`Error processing citation ${citation}: ${error}`);
+            }
+          }
+
+          return {
+            type: 'ai-highlight-result',
+            payload: {
+              success: highlightResults.length > 0,
+              data: {
+                highlights: highlightResults,
+                errors,
+                stats: pdfReader.highlight.getStats()
+              }
+            }
+          };
+        }
+
+        case 'ai-navigate-citation': {
+          const { citation } = payload as any;
+          const ingestStatus = this.pdfIngestStatus.get(documentId);
+          
+          if (!ingestStatus || ingestStatus.status !== 'completed') {
+            return {
+              type: 'ai-citation-result',
+              payload: {
+                success: false,
+                error: 'PDF not ingested. Please ingest PDF first.'
+              }
+            };
+          }
+
+          // Resolve citation
+          const resolution = await aiServiceClient.resolveCitation(ingestStatus.pdfId!, citation);
+          
+          if (resolution.found && resolution.content) {
+            // Find and navigate to the content
+            const docText = pdfReader.text.getDocument();
+            const contentIndex = docText.indexOf(resolution.content);
+            
+            if (contentIndex >= 0) {
+              // Add temporary highlight
+              const start = contentIndex;
+              const end = start + resolution.content.length;
+              
+              const tempHighlight = pdfReader.highlight.addByRange(start, end, {
+                color: HIGHLIGHT_COLORS.ORANGE,
+                note: `Navigated to citation: ${citation}`
+              });
+              
+              // Remove temporary highlight after 3 seconds
+              setTimeout(() => {
+                pdfReader.highlight.removeById(tempHighlight.id);
+              }, 3000);
+              
+              return {
+                type: 'ai-citation-result',
+                payload: {
+                  success: true,
+                  data: {
+                    ...resolution,
+                    highlight: tempHighlight,
+                    navigated: true
+                  }
+                }
+              };
+            }
+          }
+
+          return {
+            type: 'ai-citation-result',
+            payload: {
+              success: false,
+              error: `Could not navigate to citation: ${citation}`
+            }
+          };
+        }
+
+        case 'ai-resolve-citation': {
+          const { citation } = payload as any;
+          const ingestStatus = this.pdfIngestStatus.get(documentId);
+          
+          if (!ingestStatus || ingestStatus.status !== 'completed') {
+            return {
+              type: 'ai-citation-result',
+              payload: {
+                success: false,
+                error: 'PDF not ingested. Please ingest PDF first.'
+              }
+            };
+          }
+
+          const resolution = await aiServiceClient.resolveCitation(ingestStatus.pdfId!, citation);
+          
+          return {
+            type: 'ai-citation-result',
+            payload: {
+              success: resolution.found,
+              data: resolution,
+              error: resolution.error
+            }
+          };
+        }
+
+        default:
+          return {
+            type: 'ai-ingest-result',
+            payload: {
+              success: false,
+              error: `Unknown AI event type: ${event.type}`
+            }
+          };
+      }
+    } catch (error) {
+      return {
+        type: 'ai-ingest-result',
+        payload: {
+          success: false,
+          error: `Error handling AI event: ${error}`
+        }
+      };
+    }
+  }
+
+  /**
    * Register an event listener
    */
   on(eventType: string, listener: EventListener): () => void {
@@ -403,4 +675,73 @@ export const pdfHighlight = {
   
   // Get available PDF documents
   getDocuments: () => contentCommunicationService.getAvailablePDFDocuments()
+};
+
+// AI Service convenience functions
+export const aiService = {
+  // Ingest PDF for AI processing
+  ingestPDF: (documentId: string) =>
+    contentCommunicationService.sendEvent({
+      type: 'ai-ingest-pdf',
+      payload: { documentId }
+    }),
+
+  // Highlight citations in PDF
+  highlightCitations: (documentId: string, citations: string[]) =>
+    contentCommunicationService.sendEvent({
+      type: 'ai-highlight-citations',
+      payload: { documentId, citations }
+    }),
+
+  // Navigate to citation
+  navigateToCitation: (documentId: string, citation: string) =>
+    contentCommunicationService.sendEvent({
+      type: 'ai-navigate-citation',
+      payload: { documentId, citation }
+    }),
+
+  // Resolve citation
+  resolveCitation: (documentId: string, citation: string) =>
+    contentCommunicationService.sendEvent({
+      type: 'ai-resolve-citation',
+      payload: { documentId, citation }
+    }),
+
+  // Summarize PDF
+  summarizePDF: async (documentId: string, userId: string = 'user') => {
+    const availableDocuments = contentCommunicationService.getAvailablePDFDocuments();
+    const doc = availableDocuments.find(d => d.documentId === documentId);
+    
+    if (!doc) {
+      throw new Error(`Document not found: ${documentId}`);
+    }
+
+    // Ensure PDF is ingested first
+    const ingestResult = await contentCommunicationService.sendEvent({
+      type: 'ai-ingest-pdf',
+      payload: { documentId }
+    });
+
+    if (!ingestResult || !ingestResult.payload.success) {
+      throw new Error(`Failed to ingest PDF: ${ingestResult?.payload.error || 'Unknown error'}`);
+    }
+
+    // Get the PDF ID from ingest result
+    const pdfId = ingestResult.payload.data?.job_id;
+    if (!pdfId) {
+      throw new Error('Failed to get PDF ID from ingestion result');
+    }
+
+    // Call AI service to summarize
+    return await aiServiceClient.summarizePDF(pdfId, userId);
+  },
+
+  // Check if PDF is ingested
+  getPDFIngestStatus: (documentId: string) => {
+    const instance = ContentCommunicationService.getInstance() as any;
+    return instance.pdfIngestStatus.get(documentId) || { status: 'not_ingested' };
+  },
+
+  // Get AI service health
+  healthCheck: () => aiServiceClient.healthCheck()
 };

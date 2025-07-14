@@ -31,7 +31,11 @@
       "Bash(cp:*)",
       "Bash(npx vite:*)",
       "WebFetch(domain:medium.com)",
-      "WebFetch(domain:github.com)"
+      "WebFetch(domain:github.com)",
+      "Bash(python test_pdf_summary.py:*)",
+      "Bash(python:*)",
+      "Bash(pip install:*)",
+      "Bash(source:*)"
     ],
     "deny": []
   }
