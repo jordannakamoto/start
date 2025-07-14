@@ -4,6 +4,9 @@
 
 import { TextModel } from './TextModel';
 
+// Import shared canvas utility
+import { TrivialCanvas } from './TextModel';
+
 export interface Selection {
   id: string;
   start: number;
@@ -342,14 +345,86 @@ export class SelectionAPI {
    * Get selection bounds for rendering
    */
   getSelectionBounds(): SelectionBounds {
-    const allRects: SelectionBounds['rects'] = [];
-
-    for (const [id, selection] of this.selections) {
-      const rects = this.generateSelectionRects(selection);
-      allRects.push(...rects.map(rect => ({ ...rect, selectionId: id })));
+    const selection = this.getPrimarySelection();
+    if (!selection || selection.start >= selection.end) {
+        return { rects: [] };
     }
 
-    return { rects: allRects };
+    const rects: Array<{ x: number; y: number; width: number; height: number; }> = [];
+    const ctx = TrivialCanvas.getContext();
+    if (!ctx) return { rects: [] };
+
+    // Collect all unique TextItems covered by the selection
+    const relevantItems = new Set<any>();
+    for (let i = selection.start; i < selection.end; i++) {
+        const item = this.textModel.getItemAt(i);
+        if (item) relevantItems.add(item);
+    }
+
+    // Generate a precise rectangle for the selected portion of each item
+    for (const item of relevantItems) {
+        ctx.font = `${item.fontSize}px ${item.fontFamily}`;
+
+        const selStartInItem = Math.max(0, selection.start - item.charStart);
+        const selEndInItem = Math.min(item.str.length, selection.end - item.charStart);
+        
+        if (selStartInItem >= selEndInItem) continue;
+
+        // Measure the pixel offset to the start of the selection within this item
+        const startOffset = ctx.measureText(item.str.substring(0, selStartInItem)).width;
+
+        // Measure the width of the selected text segment itself
+        const selectedStrSegment = item.str.substring(selStartInItem, selEndInItem);
+        const selectedWidth = ctx.measureText(selectedStrSegment).width;
+
+        rects.push({
+            x: item.x + startOffset,
+            y: item.y - item.height, // Y coordinate is the top of the rectangle
+            width: selectedWidth,
+            height: item.height * 1.2, // Use a slight vertical padding for better look
+        });
+    }
+    
+    // Merge the individual rectangles into continuous lines for clean rendering
+    const mergedRects = this.mergeRectsOnLines(rects);
+    return { rects: mergedRects.map(rect => ({ ...rect, selectionId: selection.id })) };
+  }
+
+  /**
+   * Merge adjacent rectangles on the same line for clean rendering
+   */
+  private mergeRectsOnLines(rects: Array<{ x: number; y: number; width: number; height: number; }>): Array<{ x: number; y: number; width: number; height: number; }> {
+    if (rects.length <= 1) return rects;
+
+    const merged: Array<{ x: number; y: number; width: number; height: number; }> = [];
+    const lineMap = new Map<number, typeof rects>();
+
+    // Group rectangles by line (using their Y coordinate with a tolerance)
+    for (const rect of rects) {
+        const lineKey = Math.round(rect.y / 5) * 5; // Grouping by 5px vertical tolerance
+        if (!lineMap.has(lineKey)) lineMap.set(lineKey, []);
+        lineMap.get(lineKey)!.push(rect);
+    }
+
+    // For each line, merge adjacent rectangles
+    for (const lineRects of lineMap.values()) {
+        lineRects.sort((a, b) => a.x - b.x);
+        let currentRect = { ...lineRects[0] };
+        for (let i = 1; i < lineRects.length; i++) {
+            const nextRect = lineRects[i];
+            // If next rectangle touches or overlaps the current one, merge them
+            if (nextRect.x <= currentRect.x + currentRect.width + 2) { // 2px tolerance for gaps
+                const newWidth = (nextRect.x + nextRect.width) - currentRect.x;
+                currentRect.width = newWidth;
+            } else {
+                merged.push(currentRect);
+                currentRect = { ...nextRect };
+            }
+        }
+        merged.push(currentRect);
+    }
+    
+    return merged;
   }
 
   /**
@@ -377,41 +452,4 @@ export class SelectionAPI {
     }
   }
 
-  private generateSelectionRects(selection: Selection): Array<{ x: number; y: number; width: number; height: number; }> {
-    const rects: Array<{ x: number; y: number; width: number; height: number; }> = [];
-    let currentRect: { x: number; y: number; width: number; height: number; } | null = null;
-    let lastItem: any = null;
-
-    for (let i = selection.start; i < selection.end; i++) {
-      const item = this.textModel.getItemAt(i);
-      if (!item) continue;
-
-      const charInItem = i - item.charStart;
-      const charWidth = item.width / item.str.length;
-      const charX = item.x + charInItem * charWidth;
-      const charY = item.y - item.height * 0.8;
-      const charHeight = item.height * 1.2;
-
-      // Try to extend current rectangle
-      if (currentRect && 
-          lastItem === item && 
-          Math.abs(currentRect.y - charY) < 2) {
-        currentRect.width = charX + charWidth - currentRect.x;
-      } else {
-        // Start new rectangle
-        if (currentRect) rects.push(currentRect);
-        currentRect = {
-          x: charX,
-          y: charY,
-          width: charWidth,
-          height: charHeight
-        };
-      }
-
-      lastItem = item;
-    }
-
-    if (currentRect) rects.push(currentRect);
-    return rects;
-  }
 }

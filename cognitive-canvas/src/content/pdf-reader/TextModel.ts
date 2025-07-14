@@ -1,6 +1,21 @@
 // TextModel.ts - Pure data store for lookups and markers by other systems
 // NO UI logic, NO selection logic - only data storage and retrieval
 
+// Shared canvas context for text measurement
+export const TrivialCanvas = (() => {
+    let canvas: HTMLCanvasElement | null = null;
+    let ctx: CanvasRenderingContext2D | null = null;
+    return {
+        getContext: (): CanvasRenderingContext2D | null => {
+            if (!ctx) {
+                canvas = document.createElement('canvas');
+                ctx = canvas.getContext('2d');
+            }
+            return ctx;
+        }
+    };
+})();
+
 export interface TextItem {
   str: string;
   x: number;
@@ -442,23 +457,35 @@ export class TextModel {
    * Find character offset within a text item using proportional positioning
    * This ensures consistency with the pre-calculated text width
    */
-  private findCharacterOffset(item: TextItem, relativeX: number, absoluteX?: number, absoluteY?: number): number {
-    // If clicking before the start of the text item (left margin)
-    if (relativeX <= 0) {
-      return 0;
+  private findCharacterOffset(item: TextItem, relativeX: number, _absoluteX?: number, _absoluteY?: number): number {
+    // Handle clicking outside the item's horizontal bounds
+    if (relativeX <= 0) return 0;
+    if (relativeX >= item.width) return item.str.length;
+
+    const ctx = TrivialCanvas.getContext();
+    if (!ctx) {
+        console.warn('Canvas context unavailable, falling back to inaccurate proportional math.');
+        const proportion = relativeX / item.width;
+        return Math.round(proportion * item.str.length);
     }
 
-    // If clicking after the end of the text item (right margin or end of line)
-    if (relativeX >= item.width) {
-      return item.str.length;
-    }
+    ctx.font = `${item.fontSize}px ${item.fontFamily}`;
 
-    // For clicks within the text item, use proportional positioning
-    // This matches how the text is actually rendered
-    const proportion = relativeX / item.width;
-    const charPosition = Math.round(proportion * item.str.length);
+    // Iterate through the string, measuring substrings to find character boundaries
+    for (let i = 0; i < item.str.length; i++) {
+        const subWidth = ctx.measureText(item.str.substring(0, i + 1)).width;
+        const prevSubWidth = (i > 0) ? ctx.measureText(item.str.substring(0, i)).width : 0;
+        
+        // The character's visual space is between prevSubWidth and subWidth.
+        // Check if the click falls within this space.
+        if (relativeX >= prevSubWidth && relativeX <= subWidth) {
+            // To decide which side of the boundary to snap to, find the midpoint of the character.
+            const charCenter = prevSubWidth + (subWidth - prevSubWidth) / 2;
+            return (relativeX < charCenter) ? i : i + 1;
+        }
+    }
     
-    return Math.max(0, Math.min(charPosition, item.str.length));
+    return item.str.length; // Default to the end if loop finishes
   }
 
 

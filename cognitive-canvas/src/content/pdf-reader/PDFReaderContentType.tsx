@@ -224,7 +224,6 @@ const PDFDocumentViewer = memo(({ pages, scale }: { pages: pdfjsLib.PDFPageProxy
     const preRenderAllText = async () => {
       if (pages.length === 0) return;
 
-      console.log('Pre-rendering text for all pages...');
       const textMap = new Map<number, any[]>();
       
       // Create measurement canvas for pre-calculating text widths
@@ -302,7 +301,6 @@ const PDFDocumentViewer = memo(({ pages, scale }: { pages: pdfjsLib.PDFPageProxy
         selectionPagesRef.current = initialSelection;
       }
       
-      console.log('Text pre-rendering complete for', pages.length, 'pages');
     };
 
     preRenderAllText();
@@ -674,10 +672,8 @@ const PDFReaderEditor = memo<ContentEditorProps>(({ content, onContentChange, on
         }
 
         if (source) {
-          console.log('Loading PDF from source:', source);
           const loadingTask = pdfjsLib.getDocument(source);
           const pdf = await loadingTask.promise;
-          console.log('PDF loaded successfully:', pdf.numPages, 'pages');
           
           setPdfDocument(pdf);
           

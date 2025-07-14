@@ -28,7 +28,7 @@ export class FastSelection {
     this.selectionAPI = new SelectionAPI(this.textModel);
     
     // Listen to SelectionAPI changes and forward primary selection
-    this.selectionAPI.onSelectionChange((selections) => {
+    this.selectionAPI.onSelectionChange((_selections) => {
       const primary = this.selectionAPI.getPrimarySelection();
       if (primary !== this.currentSelection) {
         this.currentSelection = primary;
