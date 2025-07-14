@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Form
 from fastapi.middleware.cors import CORSMiddleware
 from models import PDFIngestRequest, AssistantMessageRequest, CitationResolveRequest
 from services import ingest_pdf, process_assistant_message, resolve_citation
@@ -40,12 +40,15 @@ async def assistant_message(request: AssistantMessageRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/resolve-citation")
-async def resolve_citation_endpoint(request: CitationResolveRequest):
+async def resolve_citation_endpoint(
+    pdf_id: str = Form(...),
+    citation: str = Form(...)
+):
     """
     Resolves a citation reference to its location and content in the PDF.
     """
     try:
-        result = await resolve_citation(request.pdf_id, request.citation)
+        result = await resolve_citation(pdf_id, citation)
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

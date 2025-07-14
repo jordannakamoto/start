@@ -96,8 +96,28 @@ async def summarize_pdf_with_citations(pdf_id: str) -> dict:
     Generate AI summary of PDF with citations.
     """
     try:
-        # Search for key content in the PDF
-        key_results = await search_processed_pdf(pdf_id, "important key significant conclusion", "hybrid")
+        # Search for key content in the PDF using the search store directly
+        if pdf_id not in search_store.pdf_caches:
+            return {
+                "response": "PDF not found in search index. Please ensure the PDF has been processed correctly.",
+                "citations": [],
+                "has_citations": False
+            }
+        
+        # Get all segments from the PDF for summarization
+        cache = search_store.pdf_caches[pdf_id]
+        key_results = []
+        for segment in list(cache.semantic_index.segments.values())[:10]:  # Get first 10 segments
+            key_results.append({
+                'segment': {
+                    'content': segment.content,
+                    'reference': segment.get_reference(),
+                    'page': segment.page,
+                    'paragraph': segment.paragraph,
+                    'sentence': segment.sentence,
+                    'char_range': [segment.char_start, segment.char_end]
+                }
+            })
         
         if not key_results:
             return {
@@ -187,6 +207,9 @@ async def resolve_citation(pdf_id: str, citation: str) -> dict:
     Resolve a citation reference to searchable content and coordinate information.
     """
     try:
+        # Clean citation format (remove brackets if present)
+        clean_citation = citation.strip('[]')
+        
         # Search directly in the search store for the citation reference
         if pdf_id not in search_store.pdf_caches:
             return {
@@ -199,7 +222,7 @@ async def resolve_citation(pdf_id: str, citation: str) -> dict:
         
         # Look for segment with matching reference
         for segment in cache.semantic_index.segments.values():
-            if segment.get_reference() == citation:
+            if segment.get_reference() == clean_citation:
                 return {
                     "citation": citation,
                     "found": True,

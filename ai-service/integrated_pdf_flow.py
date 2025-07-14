@@ -117,7 +117,7 @@ class SmartSearchNode(AsyncNode):
     
     async def post_async(self, shared, prep_res, exec_res):
         shared['search_results'] = exec_res
-        return exec_res
+        return None
 
 class IntegratedPDFProcessingFlow(AsyncFlow):
     """Complete flow from PDF parsing to searchable index with smart features."""
@@ -171,16 +171,30 @@ async def process_pdf_with_search(pdf_data: Dict[int, str], pdf_id: str = None):
 
 async def search_processed_pdf(pdf_id: str, query: str, search_type: str = "hybrid"):
     """Search in a processed PDF."""
-    shared_context = {
-        'pdf_id': pdf_id,
-        'search_query': query,
-        'search_type': search_type
-    }
+    if pdf_id not in search_store.pdf_caches:
+        return []
     
-    search_node = SmartSearchNode(search_store)
-    results = await search_node.run_async(shared_context)
+    results = search_store.search(pdf_id, query, search_type)
     
-    return shared_context.get('search_results', [])
+    # Convert to the expected format with segments and references
+    enriched_results = []
+    for segment in results[:10]:  # Limit to top 10 results
+        enriched_results.append({
+            'segment': {
+                'id': segment.id,
+                'content': segment.content,
+                'reference': segment.get_reference(),
+                'page': segment.page,
+                'paragraph': segment.paragraph,
+                'sentence': segment.sentence,
+                'char_range': [segment.char_start, segment.char_end],
+                'keywords': list(segment.keywords),
+                'entities': segment.entities
+            },
+            'context': {}
+        })
+    
+    return enriched_results
 
 async def test_integrated_flow():
     """Test the integrated PDF processing and search flow."""
