@@ -340,7 +340,7 @@ export class SelectionAPI {
   }
 
   /**
-   * Select word at global offset
+   * Select word at global offset - using spaces as delimiters
    */
   selectWordAt(offset: number): Selection | null {
     const text = this.textModel.getDocumentText();
@@ -349,18 +349,18 @@ export class SelectionAPI {
     let start = offset;
     let end = offset;
     
-    // Expand backward to start of word
-    while (start > 0 && /\w/.test(text[start - 1])) {
+    // Expand backward to start of word (stop at space, newline, or start)
+    while (start > 0 && !/[\s\n]/.test(text[start - 1])) {
       start--;
     }
     
-    // Expand forward to end of word
-    while (end < text.length && /\w/.test(text[end])) {
+    // Expand forward to end of word (stop at space, newline, or end)
+    while (end < text.length && !/[\s\n]/.test(text[end])) {
       end++;
     }
     
     // Ensure we have a valid word
-    if (start === end || !/\w/.test(text.slice(start, end))) {
+    if (start === end) {
       return null;
     }
     
@@ -370,7 +370,7 @@ export class SelectionAPI {
   }
 
   /**
-   * Select sentence at global offset
+   * Select sentence at global offset - using periods as delimiters
    */
   selectSentenceAt(offset: number): Selection | null {
     const text = this.textModel.getDocumentText();
@@ -515,7 +515,7 @@ export class SelectionAPI {
   }
 
   /**
-   * Select paragraph at global offset
+   * Select paragraph at global offset - expand down to line break
    */
   selectParagraphAt(offset: number): Selection | null {
     const text = this.textModel.getDocumentText();
@@ -524,19 +524,13 @@ export class SelectionAPI {
     let start = offset;
     let end = offset;
     
-    // Find paragraph start - look for double newlines or start of text
-    while (start > 0) {
-      if (text[start - 1] === '\n' && (start === 1 || text[start - 2] === '\n')) {
-        break;
-      }
+    // Find paragraph start - look backward for newlines or start of text
+    while (start > 0 && text[start - 1] !== '\n') {
       start--;
     }
     
-    // Find paragraph end - look for double newlines or end of text
-    while (end < text.length) {
-      if (text[end] === '\n' && (end === text.length - 1 || text[end + 1] === '\n')) {
-        break;
-      }
+    // Find paragraph end - look forward for newlines or end of text
+    while (end < text.length && text[end] !== '\n') {
       end++;
     }
     

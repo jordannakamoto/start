@@ -4,9 +4,9 @@
 import * as pdfjsLib from 'pdfjs-dist';
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ContentEditorProps, ContentTypeDefinition } from '../types';
-import { TextModel, SelectionAPI, Selection, TextItem } from './TextModel';
+import { FastSelectionAPI, FastSelection } from './FastSelection';
 
-// Using TextItem, Selection, etc. from TextModel.ts
+// Fast selection system - speed optimized
 
 interface PageInfo {
   index: number;
@@ -39,27 +39,20 @@ const PDFDocumentViewer = memo(({ pages, scale }: { pages: pdfjsLib.PDFPageProxy
   const containerRef = useRef<HTMLDivElement>(null);
   const textCanvasRef = useRef<HTMLCanvasElement>(null);
   const selectionCanvasRef = useRef<HTMLCanvasElement>(null);
-  const textModelRef = useRef<TextModel>(new TextModel());
-  const selectionAPIRef = useRef<SelectionAPI>(new SelectionAPI(textModelRef.current));
-  const textLinesRef = useRef<TextItem[][]>([]);
+  const selectionAPIRef = useRef<FastSelectionAPI>(new FastSelectionAPI());
   const pagesInfoRef = useRef<PageInfo[]>([]);
   const visiblePagesRef = useRef<VisiblePage[]>([]);
-  const prerenderedTextRef = useRef<Map<number, TextItem[]>>(new Map());
+  const prerenderedTextRef = useRef<Map<number, any[]>>(new Map());
   const isSelectingRef = useRef(false);
   const selectionStartRef = useRef<{x: number, y: number} | null>(null);
   const animationFrameRef = useRef<number | null>(null);
   const scrollUpdateRef = useRef<number | null>(null);
-  const lastClickTimeRef = useRef<number>(0);
-  const clickCountRef = useRef<number>(0);
-  const lastClickPositionRef = useRef<{x: number, y: number} | null>(null);
-  
-  const [selection, setSelection] = useState<Selection | null>(null);
+  const [selection, setSelection] = useState<FastSelection | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [visiblePages, setVisiblePages] = useState<VisiblePage[]>([]);
   const [scrollPosition, setScrollPosition] = useState(0);
   const [totalHeight, setTotalHeight] = useState(0);
   const [maxWidth, setMaxWidth] = useState(0);
-  const [isScrolling, setIsScrolling] = useState(false);
 
   // Calculate which pages should be visible based on scroll position
   const calculateVisiblePages = useCallback((scrollTop: number, containerHeight: number): VisiblePage[] => {
@@ -106,132 +99,22 @@ const PDFDocumentViewer = memo(({ pages, scale }: { pages: pdfjsLib.PDFPageProxy
     return pagesInfoRef.current.length;
   }, []);
 
-  // Smart selection using SelectionAPI
-  const selectWordAt = useCallback((globalOffset: number): Selection | null => {
-    return selectionAPIRef.current.selectWordAt(globalOffset);
+  // Fast coordinate to character conversion
+  const coordsToChar = useCallback((x: number, y: number): number => {
+    return selectionAPIRef.current.coordsToChar(x, y);
   }, []);
 
-  const selectSentenceAt = useCallback((globalOffset: number): Selection | null => {
-    return selectionAPIRef.current.selectSentenceAt(globalOffset);
-  }, []);
 
-  const selectParagraphAt = useCallback((globalOffset: number): Selection | null => {
-    return selectionAPIRef.current.selectParagraphAt(globalOffset);
-  }, []);
 
-  const selectAll = useCallback((): Selection | null => {
-    return selectionAPIRef.current.selectAll();
-  }, []);
-
-  const groupTextIntoLines = (items: TextItem[]): TextItem[][] => {
-    const lines: TextItem[][] = [];
-    const tolerance = 5; // pixels tolerance for same line
-    
-    items.forEach(item => {
-      let addedToLine = false;
-      
-      for (let i = 0; i < lines.length; i++) {
-        const lineY = lines[i][0].y;
-        const linePageIndex = lines[i][0].pageIndex;
-        // Items must be on same page and same Y position to be on same line
-        if (item.pageIndex === linePageIndex && Math.abs(item.y - lineY) <= tolerance) {
-          lines[i].push(item);
-          addedToLine = true;
-          break;
-        }
-      }
-      
-      if (!addedToLine) {
-        lines.push([item]);
-      }
-    });
-    
-    // Sort lines by page index, then Y position, and items within lines by X position
-    lines.sort((a, b) => {
-      if (a[0].pageIndex !== b[0].pageIndex) {
-        return a[0].pageIndex - b[0].pageIndex;
-      }
-      return a[0].y - b[0].y;
-    });
-    lines.forEach(line => line.sort((a, b) => a.x - b.x));
-    
-    return lines;
-  };
-
-  // Convert visual coordinates to global offset using TextModel
-  const positionToOffset = useCallback((x: number, y: number): number | null => {
-    return textModelRef.current.coordinatesToOffset(x, y);
-  }, []);
-
-  const drawSelection = useCallback((ctx: CanvasRenderingContext2D, sel: Selection) => {
-    if (!sel) return;
-    
-    const visualLines = textLinesRef.current;
-    const pages = textModelRef.current.getPages();
-    
-    if (!visualLines.length || !pages.length) return;
+  const drawSelection = useCallback((ctx: CanvasRenderingContext2D) => {
+    const rects = selectionAPIRef.current.getSelectionRects();
+    if (rects.length === 0) return;
     
     ctx.fillStyle = 'rgba(0, 123, 255, 0.3)';
     
-    // Convert global offsets to positions
-    const startPos = textModelRef.current.offsetToPosition(sel.startOffset);
-    const endPos = textModelRef.current.offsetToPosition(sel.endOffset);
-    
-    if (!startPos || !endPos) return;
-    
-    // Find the visual lines that correspond to our selection
-    for (let lineIndex = 0; lineIndex < visualLines.length; lineIndex++) {
-      const visualLine = visualLines[lineIndex];
-      if (visualLine.length === 0) continue;
-      
-      // Check if this visual line intersects with our selection
-      const pageIndex = visualLine[0].pageIndex;
-      const page = pages.find(p => p.pageIndex === pageIndex);
-      if (!page) continue;
-      
-      const lineInPage = page.lines.find(line => 
-        line.visualItems.some(item => 
-          visualLine.some(vItem => 
-            vItem.x === item.x && vItem.y === item.y && vItem.str === item.str
-          )
-        )
-      );
-      
-      if (!lineInPage) continue;
-      
-      // Check if selection overlaps with this line
-      if (sel.endOffset < lineInPage.startOffset || sel.startOffset > lineInPage.endOffset) {
-        continue;
-      }
-      
-      // Calculate selection bounds within this line
-      const lineStartOffset = Math.max(sel.startOffset, lineInPage.startOffset);
-      const lineEndOffset = Math.min(sel.endOffset, lineInPage.endOffset);
-      
-      // Map to visual character positions
-      const startCharInLine = lineStartOffset - lineInPage.startOffset;
-      const endCharInLine = lineEndOffset - lineInPage.startOffset;
-      
-      // Find visual coordinates
-      let startX = visualLine[0].x;
-      let endX = visualLine[visualLine.length - 1].x + visualLine[visualLine.length - 1].width;
-      
-      if (startCharInLine < visualLine.length && startCharInLine >= 0) {
-        startX = visualLine[Math.min(startCharInLine, visualLine.length - 1)].x;
-      }
-      
-      if (endCharInLine <= visualLine.length && endCharInLine >= 0) {
-        const endIndex = Math.min(endCharInLine, visualLine.length - 1);
-        endX = endCharInLine < visualLine.length ? 
-          visualLine[endIndex].x + visualLine[endIndex].width :
-          visualLine[endIndex].x + visualLine[endIndex].width;
-      }
-      
-      // Draw selection rectangle
-      const y = visualLine[0].y - visualLine[0].fontSize * 0.8;
-      const height = visualLine[0].fontSize * 1.1;
-      
-      ctx.fillRect(startX, y, Math.max(endX - startX, 2), height);
+    // Draw all selection rectangles - fast
+    for (const rect of rects) {
+      ctx.fillRect(rect.x, rect.y, rect.width, rect.height);
     }
   }, []);
 
@@ -243,116 +126,47 @@ const PDFDocumentViewer = memo(({ pages, scale }: { pages: pdfjsLib.PDFPageProxy
   const updateSelection = useCallback((x: number, y: number) => {
     if (!isSelectingRef.current || !selectionStartRef.current) return;
     
-    const startOffset = positionToOffset(selectionStartRef.current.x, selectionStartRef.current.y);
-    const endOffset = positionToOffset(x, y);
+    const startChar = coordsToChar(selectionStartRef.current.x, selectionStartRef.current.y);
+    const endChar = coordsToChar(x, y);
     
-    if (startOffset !== null && endOffset !== null) {
-      // Use SelectionAPI to create selection
-      const newSelection = selectionAPIRef.current.selectRange(startOffset, endOffset);
-      
-      if (newSelection) {
-        setSelection(newSelection);
-        
-        // Immediately update selection canvas
-        if (selectionCanvasRef.current) {
-          const ctx = selectionCanvasRef.current.getContext('2d');
-          if (ctx) {
-            drawSelection(ctx, newSelection);
-          }
-        }
-      }
-    }
-  }, [positionToOffset, drawSelection]);
+    // Set selection immediately - fast
+    selectionAPIRef.current.setSelection(startChar, endChar);
+    setSelection(selectionAPIRef.current.getSelection());
+  }, [coordsToChar]);
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     if (!textCanvasRef.current) return;
     
-    // Prevent default browser selection behavior
+    // Prevent browser selection
     e.preventDefault();
     e.stopPropagation();
+    
+    // Clear browser selection
+    if (window.getSelection) {
+      window.getSelection()?.removeAllRanges();
+    }
     
     const rect = textCanvasRef.current.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
     
-    const currentTime = Date.now();
-    const timeDiff = currentTime - lastClickTimeRef.current;
-    const positionDiff = lastClickPositionRef.current ? 
-      Math.abs(x - lastClickPositionRef.current.x) + Math.abs(y - lastClickPositionRef.current.y) : Infinity;
-    
-    // Reset click count if too much time passed or click is far from last click
-    if (timeDiff > 500 || positionDiff > 10) {
-      clickCountRef.current = 1;
-    } else {
-      clickCountRef.current++;
-    }
-    
-    lastClickTimeRef.current = currentTime;
-    lastClickPositionRef.current = { x, y };
-    
-    // Get global offset for smart selection
-    const globalOffset = positionToOffset(x, y);
-    
-    if (globalOffset !== null && clickCountRef.current > 1) {
-      // Smart selection with legal document support
-      let newSelection: Selection | null = null;
-      
-      switch (clickCountRef.current) {
-        case 2: // Double-click: Select word
-          newSelection = selectWordAt(globalOffset);
-          break;
-        case 3: // Triple-click: Select sentence/clause
-          newSelection = selectSentenceAt(globalOffset);
-          break;
-        case 4: // Quad-click: Select legal clause
-          newSelection = selectionAPIRef.current.selectClauseAt(globalOffset);
-          break;
-        case 5: // 5-click: Select legal section
-          newSelection = selectionAPIRef.current.selectSectionAt(globalOffset);
-          break;
-        case 6: // 6-click: Select paragraph
-          newSelection = selectParagraphAt(globalOffset);
-          break;
-        default: // 7+ clicks: Select all text
-          newSelection = selectAll();
-          break;
-      }
-      
-      if (newSelection) {
-        setSelection(newSelection);
-        isSelectingRef.current = false;
-        selectionStartRef.current = null;
-        return;
-      }
-    }
-    
-    // Normal click - start manual selection
+    // Start selection
     isSelectingRef.current = true;
     selectionStartRef.current = { x, y };
     selectionAPIRef.current.clearSelection();
     setSelection(null);
-    
-    // Clear selection canvas
-    if (selectionCanvasRef.current) {
-      const ctx = selectionCanvasRef.current.getContext('2d');
-      if (ctx) {
-        ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-      }
-    }
-  }, [positionToOffset, selectWordAt, selectSentenceAt, selectParagraphAt, selectAll]);
+  }, []);
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
     if (!isSelectingRef.current || !textCanvasRef.current) return;
     
-    // Prevent default browser behavior
     e.preventDefault();
     
-    // Cancel previous animation frame for performance
+    // Throttle with requestAnimationFrame
     if (animationFrameRef.current) {
       cancelAnimationFrame(animationFrameRef.current);
     }
     
-    // Throttle updates using requestAnimationFrame for 60fps
     animationFrameRef.current = requestAnimationFrame(() => {
       if (!textCanvasRef.current) return;
       
@@ -364,11 +178,7 @@ const PDFDocumentViewer = memo(({ pages, scale }: { pages: pdfjsLib.PDFPageProxy
     });
   }, [updateSelection]);
 
-  const handleMouseUp = useCallback((e: React.MouseEvent) => {
-    // Prevent default browser behavior
-    e.preventDefault();
-    e.stopPropagation();
-    
+  const handleMouseUp = useCallback(() => {
     isSelectingRef.current = false;
     selectionStartRef.current = null;
     
@@ -397,7 +207,7 @@ const PDFDocumentViewer = memo(({ pages, scale }: { pages: pdfjsLib.PDFPageProxy
       if (pages.length === 0) return;
 
       console.log('Pre-rendering text for all pages...');
-      const textMap = new Map<number, TextItem[]>();
+      const textMap = new Map<number, any[]>();
       
       // Calculate document dimensions and page positions
       let docTotalHeight = 0;
@@ -417,7 +227,7 @@ const PDFDocumentViewer = memo(({ pages, scale }: { pages: pdfjsLib.PDFPageProxy
         
         // Pre-extract text content for this page
         const textContent = await page.getTextContent();
-        const pageTextItems: TextItem[] = [];
+        const pageTextItems: any[] = [];
         
         textContent.items.forEach((item: any) => {
           if (item.str.trim()) {
@@ -434,7 +244,8 @@ const PDFDocumentViewer = memo(({ pages, scale }: { pages: pdfjsLib.PDFPageProxy
               height: fontSize,
               fontSize,
               fontFamily: item.fontName || 'serif',
-              pageIndex
+              pageIndex,
+              globalCharIndex: 0 // Will be set during SelectionAPI initialization
             });
           }
         });
@@ -500,7 +311,7 @@ const PDFDocumentViewer = memo(({ pages, scale }: { pages: pdfjsLib.PDFPageProxy
       const scrollTop = containerRef.current?.scrollTop || 0;
 
       // Render visible pages using pre-rendered text
-      const allVisibleTextItems: TextItem[] = [];
+      const allVisibleTextItems: any[] = [];
 
       for (const visiblePage of visiblePages) {
         const { pageIndex, viewport, offsetY } = visiblePage;
@@ -533,7 +344,8 @@ const PDFDocumentViewer = memo(({ pages, scale }: { pages: pdfjsLib.PDFPageProxy
               height: textItem.fontSize,
               fontSize: textItem.fontSize,
               fontFamily: textItem.fontFamily,
-              pageIndex: textItem.pageIndex
+              pageIndex: textItem.pageIndex,
+              globalCharIndex: 0 // Will be set during SelectionAPI initialization
             });
           }
         }
@@ -552,14 +364,11 @@ const PDFDocumentViewer = memo(({ pages, scale }: { pages: pdfjsLib.PDFPageProxy
         }
       }
 
-      // Group text items into lines
-      const lines = groupTextIntoLines(allVisibleTextItems);
-      textLinesRef.current = lines;
-      
-      // Only rebuild text model if visible pages changed (performance optimization)
+      // Only rebuild FastSelectionAPI if visible pages changed (performance optimization)
       const currentVisiblePagesKey = visiblePages.map(p => p.pageIndex).sort().join(',');
       if (currentVisiblePagesKey !== lastVisiblePagesRef.current) {
-        textModelRef.current.buildFromVisualItems(allVisibleTextItems);
+        // Initialize fast selection with simple text items
+        selectionAPIRef.current.init(allVisibleTextItems);
         lastVisiblePagesRef.current = currentVisiblePagesKey;
       }
 
@@ -601,7 +410,7 @@ const PDFDocumentViewer = memo(({ pages, scale }: { pages: pdfjsLib.PDFPageProxy
 
       // Render selection if exists
       if (selection) {
-        drawSelection(selectionCtx, selection);
+        drawSelection(selectionCtx);
       }
     };
 
@@ -615,7 +424,6 @@ const PDFDocumentViewer = memo(({ pages, scale }: { pages: pdfjsLib.PDFPageProxy
     const handleScroll = () => {
       if (!containerRef.current) return;
       
-      setIsScrolling(true);
       
       // Clear previous timeout
       if (scrollTimeout) {
@@ -654,7 +462,7 @@ const PDFDocumentViewer = memo(({ pages, scale }: { pages: pdfjsLib.PDFPageProxy
       
       // Mark scrolling as finished after 150ms of no scroll events
       scrollTimeout = window.setTimeout(() => {
-        setIsScrolling(false);
+        // Scrolling finished
       }, 150);
     };
 
@@ -672,7 +480,19 @@ const PDFDocumentViewer = memo(({ pages, scale }: { pages: pdfjsLib.PDFPageProxy
 
 
   return (
-    <div ref={containerRef} className="relative w-full h-full overflow-auto bg-gray-100">
+    <div 
+      ref={containerRef} 
+      className="relative w-full h-full overflow-auto bg-gray-100"
+      style={{
+        userSelect: 'none',
+        WebkitUserSelect: 'none',
+        MozUserSelect: 'none',
+        msUserSelect: 'none',
+        WebkitTouchCallout: 'none',
+        WebkitTapHighlightColor: 'transparent'
+      }}
+      onDragStart={(e: React.DragEvent) => e.preventDefault()}
+    >
       {/* Invisible scroll spacer to create proper scroll height */}
       <div style={{ height: totalHeight, width: 1, position: 'absolute', left: 0, top: 0, pointerEvents: 'none' }} />
       
@@ -728,26 +548,11 @@ const PDFDocumentViewer = memo(({ pages, scale }: { pages: pdfjsLib.PDFPageProxy
         if (!selection) return null;
         
         const selectedText = getSelectedText();
-        const getSelectionTypeIcon = (count: number) => {
-          switch (count) {
-            case 2: return '📝 Word';
-            case 3: return '📄 Sentence';
-            case 4: return '⚖️ Clause';
-            case 5: return '📜 Section';
-            case 6: return '📋 Paragraph';
-            default: return '📚 All';
-          }
-        };
         
         return (
           <div className="fixed top-4 left-4 text-xs text-gray-700 bg-yellow-200 px-2 py-1 rounded shadow border">
             <div className="flex items-center gap-2">
               <span>Selected: {selectedText.length} chars</span>
-              {clickCountRef.current > 1 && (
-                <span className="text-blue-600 font-medium">
-                  {getSelectionTypeIcon(clickCountRef.current)}
-                </span>
-              )}
             </div>
           </div>
         );
@@ -925,16 +730,11 @@ const PDFReaderEditor = memo<ContentEditorProps>(({ content, onContentChange, on
                 </button>
               </div>
               
-              {/* Smart selection help */}
+              {/* Selection help */}
               <div className="bg-blue-50/90 backdrop-blur rounded-lg shadow-sm border border-blue-200 p-2 text-xs text-blue-800 max-w-56">
-                <div className="font-medium mb-1">Legal Doc Smart Selection:</div>
-                <div>1× Click: Manual select</div>
-                <div>2× Click: Select word</div>
-                <div>3× Click: Select sentence</div>
-                <div>4× Click: Select clause</div>
-                <div>5× Click: Select section</div>
-                <div>6× Click: Select paragraph</div>
-                <div>7× Click: Select all</div>
+                <div className="font-medium mb-1">Fast Selection:</div>
+                <div>Click and drag to select text</div>
+                <div>Ctrl/Cmd+C to copy</div>
               </div>
             </div>
             
