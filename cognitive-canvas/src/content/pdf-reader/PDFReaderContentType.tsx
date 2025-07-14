@@ -4,25 +4,9 @@
 import * as pdfjsLib from 'pdfjs-dist';
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ContentEditorProps, ContentTypeDefinition } from '../types';
+import { TextModel, SelectionAPI, Selection, TextItem } from './TextModel';
 
-interface TextItem {
-  str: string;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  fontSize: number;
-  fontFamily: string;
-  transform: number[];
-  pageIndex: number;
-}
-
-interface Selection {
-  startLine: number;
-  endLine: number;
-  startChar: number;
-  endChar: number;
-}
+// Using TextItem, Selection, etc. from TextModel.ts
 
 interface PageInfo {
   index: number;
@@ -55,6 +39,8 @@ const PDFDocumentViewer = memo(({ pages, scale }: { pages: pdfjsLib.PDFPageProxy
   const containerRef = useRef<HTMLDivElement>(null);
   const textCanvasRef = useRef<HTMLCanvasElement>(null);
   const selectionCanvasRef = useRef<HTMLCanvasElement>(null);
+  const textModelRef = useRef<TextModel>(new TextModel());
+  const selectionAPIRef = useRef<SelectionAPI>(new SelectionAPI(textModelRef.current));
   const textLinesRef = useRef<TextItem[][]>([]);
   const pagesInfoRef = useRef<PageInfo[]>([]);
   const visiblePagesRef = useRef<VisiblePage[]>([]);
@@ -63,6 +49,9 @@ const PDFDocumentViewer = memo(({ pages, scale }: { pages: pdfjsLib.PDFPageProxy
   const selectionStartRef = useRef<{x: number, y: number} | null>(null);
   const animationFrameRef = useRef<number | null>(null);
   const scrollUpdateRef = useRef<number | null>(null);
+  const lastClickTimeRef = useRef<number>(0);
+  const clickCountRef = useRef<number>(0);
+  const lastClickPositionRef = useRef<{x: number, y: number} | null>(null);
   
   const [selection, setSelection] = useState<Selection | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
@@ -70,6 +59,7 @@ const PDFDocumentViewer = memo(({ pages, scale }: { pages: pdfjsLib.PDFPageProxy
   const [scrollPosition, setScrollPosition] = useState(0);
   const [totalHeight, setTotalHeight] = useState(0);
   const [maxWidth, setMaxWidth] = useState(0);
+  const [isScrolling, setIsScrolling] = useState(false);
 
   // Calculate which pages should be visible based on scroll position
   const calculateVisiblePages = useCallback((scrollTop: number, containerHeight: number): VisiblePage[] => {
@@ -116,6 +106,23 @@ const PDFDocumentViewer = memo(({ pages, scale }: { pages: pdfjsLib.PDFPageProxy
     return pagesInfoRef.current.length;
   }, []);
 
+  // Smart selection using SelectionAPI
+  const selectWordAt = useCallback((globalOffset: number): Selection | null => {
+    return selectionAPIRef.current.selectWordAt(globalOffset);
+  }, []);
+
+  const selectSentenceAt = useCallback((globalOffset: number): Selection | null => {
+    return selectionAPIRef.current.selectSentenceAt(globalOffset);
+  }, []);
+
+  const selectParagraphAt = useCallback((globalOffset: number): Selection | null => {
+    return selectionAPIRef.current.selectParagraphAt(globalOffset);
+  }, []);
+
+  const selectAll = useCallback((): Selection | null => {
+    return selectionAPIRef.current.selectAll();
+  }, []);
+
   const groupTextIntoLines = (items: TextItem[]): TextItem[][] => {
     const lines: TextItem[][] = [];
     const tolerance = 5; // pixels tolerance for same line
@@ -151,92 +158,111 @@ const PDFDocumentViewer = memo(({ pages, scale }: { pages: pdfjsLib.PDFPageProxy
     return lines;
   };
 
-  const drawSelection = useCallback((ctx: CanvasRenderingContext2D, sel: Selection, textLines: TextItem[][]) => {
-    if (!sel || textLines.length === 0) return;
+  // Convert visual coordinates to global offset using TextModel
+  const positionToOffset = useCallback((x: number, y: number): number | null => {
+    return textModelRef.current.coordinatesToOffset(x, y);
+  }, []);
+
+  const drawSelection = useCallback((ctx: CanvasRenderingContext2D, sel: Selection) => {
+    if (!sel) return;
     
-    // Clear the selection canvas
-    ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+    const visualLines = textLinesRef.current;
+    const pages = textModelRef.current.getPages();
+    
+    if (!visualLines.length || !pages.length) return;
     
     ctx.fillStyle = 'rgba(0, 123, 255, 0.3)';
     
-    for (let lineIndex = sel.startLine; lineIndex <= sel.endLine; lineIndex++) {
-      if (lineIndex >= textLines.length) break;
+    // Convert global offsets to positions
+    const startPos = textModelRef.current.offsetToPosition(sel.startOffset);
+    const endPos = textModelRef.current.offsetToPosition(sel.endOffset);
+    
+    if (!startPos || !endPos) return;
+    
+    // Find the visual lines that correspond to our selection
+    for (let lineIndex = 0; lineIndex < visualLines.length; lineIndex++) {
+      const visualLine = visualLines[lineIndex];
+      if (visualLine.length === 0) continue;
       
-      const line = textLines[lineIndex];
-      const startChar = lineIndex === sel.startLine ? sel.startChar : 0;
-      const endChar = lineIndex === sel.endLine ? sel.endChar : line.length - 1;
+      // Check if this visual line intersects with our selection
+      const pageIndex = visualLine[0].pageIndex;
+      const page = pages.find(p => p.pageIndex === pageIndex);
+      if (!page) continue;
       
-      if (startChar < line.length && endChar >= 0) {
-        const startX = startChar < line.length ? line[startChar].x : line[line.length - 1].x + line[line.length - 1].width;
-        const endX = endChar < line.length ? line[endChar].x + line[endChar].width : line[line.length - 1].x + line[line.length - 1].width;
-        const y = line[0].y - line[0].fontSize;
-        const height = line[0].fontSize * 1.2;
-        
-        ctx.fillRect(startX, y, endX - startX, height);
+      const lineInPage = page.lines.find(line => 
+        line.visualItems.some(item => 
+          visualLine.some(vItem => 
+            vItem.x === item.x && vItem.y === item.y && vItem.str === item.str
+          )
+        )
+      );
+      
+      if (!lineInPage) continue;
+      
+      // Check if selection overlaps with this line
+      if (sel.endOffset < lineInPage.startOffset || sel.startOffset > lineInPage.endOffset) {
+        continue;
       }
+      
+      // Calculate selection bounds within this line
+      const lineStartOffset = Math.max(sel.startOffset, lineInPage.startOffset);
+      const lineEndOffset = Math.min(sel.endOffset, lineInPage.endOffset);
+      
+      // Map to visual character positions
+      const startCharInLine = lineStartOffset - lineInPage.startOffset;
+      const endCharInLine = lineEndOffset - lineInPage.startOffset;
+      
+      // Find visual coordinates
+      let startX = visualLine[0].x;
+      let endX = visualLine[visualLine.length - 1].x + visualLine[visualLine.length - 1].width;
+      
+      if (startCharInLine < visualLine.length && startCharInLine >= 0) {
+        startX = visualLine[Math.min(startCharInLine, visualLine.length - 1)].x;
+      }
+      
+      if (endCharInLine <= visualLine.length && endCharInLine >= 0) {
+        const endIndex = Math.min(endCharInLine, visualLine.length - 1);
+        endX = endCharInLine < visualLine.length ? 
+          visualLine[endIndex].x + visualLine[endIndex].width :
+          visualLine[endIndex].x + visualLine[endIndex].width;
+      }
+      
+      // Draw selection rectangle
+      const y = visualLine[0].y - visualLine[0].fontSize * 0.8;
+      const height = visualLine[0].fontSize * 1.1;
+      
+      ctx.fillRect(startX, y, Math.max(endX - startX, 2), height);
     }
   }, []);
 
-  const getCharAtPosition = useCallback((x: number, y: number, textLines: TextItem[][]): {line: number, char: number} | null => {
-    for (let lineIndex = 0; lineIndex < textLines.length; lineIndex++) {
-      const line = textLines[lineIndex];
-      if (line.length === 0) continue;
-      
-      const lineTop = line[0].y - line[0].fontSize;
-      const lineBottom = line[0].y + line[0].fontSize * 0.2;
-      
-      if (y >= lineTop && y <= lineBottom) {
-        for (let charIndex = 0; charIndex < line.length; charIndex++) {
-          const item = line[charIndex];
-          if (x >= item.x && x <= item.x + item.width) {
-            // Check if we're closer to start or end of character
-            const charCenter = item.x + item.width / 2;
-            return { line: lineIndex, char: x < charCenter ? charIndex : charIndex + 1 };
-          }
-        }
-        // If past the end of the line
-        if (x > line[line.length - 1].x + line[line.length - 1].width) {
-          return { line: lineIndex, char: line.length };
-        }
-        // If before the start of the line
-        if (x < line[0].x) {
-          return { line: lineIndex, char: 0 };
-        }
-      }
-    }
-    return null;
+  const getSelectedText = useCallback((): string => {
+    return selectionAPIRef.current.getSelectedText();
   }, []);
+
 
   const updateSelection = useCallback((x: number, y: number) => {
     if (!isSelectingRef.current || !selectionStartRef.current) return;
     
-    const startPos = getCharAtPosition(selectionStartRef.current.x, selectionStartRef.current.y, textLinesRef.current);
-    const endPos = getCharAtPosition(x, y, textLinesRef.current);
+    const startOffset = positionToOffset(selectionStartRef.current.x, selectionStartRef.current.y);
+    const endOffset = positionToOffset(x, y);
     
-    if (startPos && endPos) {
-      let startLine = startPos.line;
-      let startChar = startPos.char;
-      let endLine = endPos.line;
-      let endChar = endPos.char;
+    if (startOffset !== null && endOffset !== null) {
+      // Use SelectionAPI to create selection
+      const newSelection = selectionAPIRef.current.selectRange(startOffset, endOffset);
       
-      // Ensure selection goes in the right direction
-      if (startLine > endLine || (startLine === endLine && startChar > endChar)) {
-        [startLine, endLine] = [endLine, startLine];
-        [startChar, endChar] = [endChar, startChar];
-      }
-      
-      const newSelection = { startLine, endLine, startChar, endChar };
-      setSelection(newSelection);
-      
-      // Immediately update selection canvas
-      if (selectionCanvasRef.current) {
-        const ctx = selectionCanvasRef.current.getContext('2d');
-        if (ctx) {
-          drawSelection(ctx, newSelection, textLinesRef.current);
+      if (newSelection) {
+        setSelection(newSelection);
+        
+        // Immediately update selection canvas
+        if (selectionCanvasRef.current) {
+          const ctx = selectionCanvasRef.current.getContext('2d');
+          if (ctx) {
+            drawSelection(ctx, newSelection);
+          }
         }
       }
     }
-  }, [getCharAtPosition, drawSelection]);
+  }, [positionToOffset, drawSelection]);
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     if (!textCanvasRef.current) return;
@@ -245,6 +271,52 @@ const PDFDocumentViewer = memo(({ pages, scale }: { pages: pdfjsLib.PDFPageProxy
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
     
+    const currentTime = Date.now();
+    const timeDiff = currentTime - lastClickTimeRef.current;
+    const positionDiff = lastClickPositionRef.current ? 
+      Math.abs(x - lastClickPositionRef.current.x) + Math.abs(y - lastClickPositionRef.current.y) : Infinity;
+    
+    // Reset click count if too much time passed or click is far from last click
+    if (timeDiff > 500 || positionDiff > 10) {
+      clickCountRef.current = 1;
+    } else {
+      clickCountRef.current++;
+    }
+    
+    lastClickTimeRef.current = currentTime;
+    lastClickPositionRef.current = { x, y };
+    
+    // Get global offset for smart selection
+    const globalOffset = positionToOffset(x, y);
+    
+    if (globalOffset !== null && clickCountRef.current > 1) {
+      // Smart selection based on click count
+      let newSelection: Selection | null = null;
+      
+      switch (clickCountRef.current) {
+        case 2: // Double-click: Select word
+          newSelection = selectWordAt(globalOffset);
+          break;
+        case 3: // Triple-click: Select sentence
+          newSelection = selectSentenceAt(globalOffset);
+          break;
+        case 4: // Quad-click: Select paragraph
+          newSelection = selectParagraphAt(globalOffset);
+          break;
+        default: // 5+ clicks: Select all text
+          newSelection = selectAll();
+          break;
+      }
+      
+      if (newSelection) {
+        setSelection(newSelection);
+        isSelectingRef.current = false;
+        selectionStartRef.current = null;
+        return;
+      }
+    }
+    
+    // Normal click - start manual selection
     isSelectingRef.current = true;
     selectionStartRef.current = { x, y };
     setSelection(null);
@@ -256,7 +328,7 @@ const PDFDocumentViewer = memo(({ pages, scale }: { pages: pdfjsLib.PDFPageProxy
         ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
       }
     }
-  }, []);
+  }, [positionToOffset, selectWordAt, selectSentenceAt, selectParagraphAt, selectAll]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
     if (!isSelectingRef.current || !textCanvasRef.current) return;
@@ -286,28 +358,6 @@ const PDFDocumentViewer = memo(({ pages, scale }: { pages: pdfjsLib.PDFPageProxy
     }
   }, []);
 
-  const getSelectedText = useCallback((): string => {
-    if (!selection || textLinesRef.current.length === 0) return '';
-    
-    let result = '';
-    for (let lineIndex = selection.startLine; lineIndex <= selection.endLine; lineIndex++) {
-      if (lineIndex >= textLinesRef.current.length) break;
-      
-      const line = textLinesRef.current[lineIndex];
-      const startChar = lineIndex === selection.startLine ? selection.startChar : 0;
-      const endChar = lineIndex === selection.endLine ? selection.endChar : line.length;
-      
-      for (let charIndex = startChar; charIndex < Math.min(endChar, line.length); charIndex++) {
-        result += line[charIndex].str;
-      }
-      
-      if (lineIndex < selection.endLine) {
-        result += '\n';
-      }
-    }
-    
-    return result;
-  }, [selection]);
 
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     if ((e.ctrlKey || e.metaKey) && e.key === 'c' && selection) {
@@ -364,7 +414,6 @@ const PDFDocumentViewer = memo(({ pages, scale }: { pages: pdfjsLib.PDFPageProxy
               height: fontSize,
               fontSize,
               fontFamily: item.fontName || 'serif',
-              transform: item.transform,
               pageIndex
             });
           }
@@ -395,38 +444,28 @@ const PDFDocumentViewer = memo(({ pages, scale }: { pages: pdfjsLib.PDFPageProxy
   }, [pages, scale, calculateVisiblePages]);
 
 
-  // Render visible pages directly to canvas (no double buffering for perfect alignment)
+  // Render text layer only (performance optimized)
   useEffect(() => {
-    const renderVisiblePages = () => {
-      if (!textCanvasRef.current || !selectionCanvasRef.current || 
-          visiblePages.length === 0 || !containerRef.current || prerenderedTextRef.current.size === 0) return;
+    const renderTextLayer = () => {
+      if (!textCanvasRef.current || visiblePages.length === 0 || !containerRef.current || 
+          prerenderedTextRef.current.size === 0) return;
 
       const textCanvas = textCanvasRef.current;
-      const selectionCanvas = selectionCanvasRef.current;
-      
       const textCtx = textCanvas.getContext('2d');
-      const selectionCtx = selectionCanvas.getContext('2d');
-      
-      if (!textCtx || !selectionCtx) return;
+      if (!textCtx) return;
 
       // Get container dimensions
       const containerWidth = containerRef.current.clientWidth;
       const containerHeight = containerRef.current.clientHeight;
       const devicePixelRatio = window.devicePixelRatio || 1;
       
-      // Setup both canvases identically
+      // Setup text canvas
       textCanvas.width = containerWidth * devicePixelRatio;
       textCanvas.height = containerHeight * devicePixelRatio;
       textCanvas.style.width = `${containerWidth}px`;
       textCanvas.style.height = `${containerHeight}px`;
       
-      selectionCanvas.width = containerWidth * devicePixelRatio;
-      selectionCanvas.height = containerHeight * devicePixelRatio;
-      selectionCanvas.style.width = `${containerWidth}px`;
-      selectionCanvas.style.height = `${containerHeight}px`;
-      
       textCtx.scale(devicePixelRatio, devicePixelRatio);
-      selectionCtx.scale(devicePixelRatio, devicePixelRatio);
       textCtx.textBaseline = 'alphabetic';
 
       // Clear text canvas with white background
@@ -464,10 +503,14 @@ const PDFDocumentViewer = memo(({ pages, scale }: { pages: pdfjsLib.PDFPageProxy
             const width = textCtx.measureText(textItem.str).width;
             
             allVisibleTextItems.push({
-              ...textItem,
+              str: textItem.str,
               x: centeredX,
               y: relativeY,
-              width
+              width,
+              height: textItem.fontSize,
+              fontSize: textItem.fontSize,
+              fontFamily: textItem.fontFamily,
+              pageIndex: textItem.pageIndex
             });
           }
         }
@@ -486,9 +529,12 @@ const PDFDocumentViewer = memo(({ pages, scale }: { pages: pdfjsLib.PDFPageProxy
         }
       }
 
-      // Group text items into lines for selection
+      // Group text items into lines and build text model
       const lines = groupTextIntoLines(allVisibleTextItems);
       textLinesRef.current = lines;
+      
+      // Build text model for accurate selection using the new TextModel class
+      textModelRef.current.buildFromVisualItems(allVisibleTextItems);
 
       // Render all text directly to text canvas
       textCtx.fillStyle = '#1a1a1a';
@@ -496,20 +542,58 @@ const PDFDocumentViewer = memo(({ pages, scale }: { pages: pdfjsLib.PDFPageProxy
         textCtx.font = `${item.fontSize}px ${item.fontFamily}`;
         textCtx.fillText(item.str, item.x, item.y);
       });
+    };
+
+    renderTextLayer();
+  }, [visiblePages, scale, maxWidth, scrollPosition]);
+
+  // Separate effect for selection rendering (performance optimized)
+  useEffect(() => {
+    const renderSelection = () => {
+      if (!selectionCanvasRef.current || !containerRef.current) return;
+
+      const selectionCanvas = selectionCanvasRef.current;
+      const selectionCtx = selectionCanvas.getContext('2d');
+      if (!selectionCtx) return;
+
+      // Get container dimensions
+      const containerWidth = containerRef.current.clientWidth;
+      const containerHeight = containerRef.current.clientHeight;
+      const devicePixelRatio = window.devicePixelRatio || 1;
       
-      // Immediately redraw selection using the exact same coordinates
+      // Setup selection canvas to match text canvas exactly
+      selectionCanvas.width = containerWidth * devicePixelRatio;
+      selectionCanvas.height = containerHeight * devicePixelRatio;
+      selectionCanvas.style.width = `${containerWidth}px`;
+      selectionCanvas.style.height = `${containerHeight}px`;
+      
+      selectionCtx.scale(devicePixelRatio, devicePixelRatio);
+
+      // Clear selection canvas
+      selectionCtx.clearRect(0, 0, containerWidth, containerHeight);
+
+      // Render selection if exists
       if (selection) {
-        drawSelection(selectionCtx, selection, textLinesRef.current);
+        drawSelection(selectionCtx, selection);
       }
     };
 
-    renderVisiblePages();
-  }, [visiblePages, scale, maxWidth, scrollPosition, selection, drawSelection]);
+    renderSelection();
+  }, [selection, drawSelection, visiblePages, scrollPosition]);
 
-  // Handle scroll events
+  // Handle scroll events with performance optimization
   useEffect(() => {
+    let scrollTimeout: number | null = null;
+    
     const handleScroll = () => {
       if (!containerRef.current) return;
+      
+      setIsScrolling(true);
+      
+      // Clear previous timeout
+      if (scrollTimeout) {
+        clearTimeout(scrollTimeout);
+      }
       
       // Cancel previous update
       if (scrollUpdateRef.current) {
@@ -521,17 +605,17 @@ const PDFDocumentViewer = memo(({ pages, scale }: { pages: pdfjsLib.PDFPageProxy
         const scrollTop = containerRef.current!.scrollTop;
         const containerHeight = containerRef.current!.clientHeight;
         
-        // Update scroll position for rendering dependency
+        // Update scroll position for rendering dependency (throttled)
         setScrollPosition(scrollTop);
         
         // Update current page
         const newCurrentPage = calculateCurrentPage(scrollTop);
-        setCurrentPage(newCurrentPage);
+        if (newCurrentPage !== currentPage) {
+          setCurrentPage(newCurrentPage);
+        }
         
-        // Update visible pages
+        // Update visible pages only if they actually changed
         const newVisiblePages = calculateVisiblePages(scrollTop, containerHeight);
-        
-        // Only update if visible pages changed
         const visiblePageIndices = newVisiblePages.map(p => p.pageIndex).sort();
         const currentVisibleIndices = visiblePagesRef.current.map(p => p.pageIndex).sort();
         
@@ -540,14 +624,24 @@ const PDFDocumentViewer = memo(({ pages, scale }: { pages: pdfjsLib.PDFPageProxy
           visiblePagesRef.current = newVisiblePages;
         }
       });
+      
+      // Mark scrolling as finished after 150ms of no scroll events
+      scrollTimeout = window.setTimeout(() => {
+        setIsScrolling(false);
+      }, 150);
     };
 
     const container = containerRef.current;
     if (container) {
       container.addEventListener('scroll', handleScroll, { passive: true });
-      return () => container.removeEventListener('scroll', handleScroll);
+      return () => {
+        container.removeEventListener('scroll', handleScroll);
+        if (scrollTimeout) {
+          clearTimeout(scrollTimeout);
+        }
+      };
     }
-  }, [calculateCurrentPage, calculateVisiblePages]);
+  }, [calculateCurrentPage, calculateVisiblePages, currentPage]);
 
 
   return (
@@ -583,10 +677,19 @@ const PDFDocumentViewer = memo(({ pages, scale }: { pages: pdfjsLib.PDFPageProxy
         Page {currentPage} of {pages.length}
       </div>
 
-      {/* Selection indicator */}
+      {/* Selection indicator with smart selection type */}
       {selection && (
         <div className="fixed top-4 left-4 text-xs text-gray-700 bg-yellow-200 px-2 py-1 rounded shadow border">
-          Selected: {getSelectedText().length} chars
+          <div className="flex items-center gap-2">
+            <span>Selected: {getSelectedText().length} chars</span>
+            {clickCountRef.current > 1 && (
+              <span className="text-blue-600 font-medium">
+                {clickCountRef.current === 2 ? '📝 Word' :
+                 clickCountRef.current === 3 ? '📄 Sentence' :
+                 clickCountRef.current === 4 ? '📋 Paragraph' : '📚 All'}
+              </span>
+            )}
+          </div>
         </div>
       )}
     </div>
@@ -744,21 +847,33 @@ const PDFReaderEditor = memo<ContentEditorProps>(({ content, onContentChange, on
       >
         {pages.length > 0 && (
           <>
-            {/* Scale controls */}
-            <div className="absolute top-4 right-4 z-10 flex gap-2 bg-white/90 backdrop-blur rounded-lg shadow-sm border p-2">
-              <button 
-                onClick={() => setScale(s => Math.max(0.5, s - 0.25))}
-                className="px-3 py-1 bg-gray-200 hover:bg-gray-300 rounded text-sm font-medium"
-              >
-                -
-              </button>
-              <span className="px-3 py-1 text-sm font-medium">{Math.round(scale * 100)}%</span>
-              <button 
-                onClick={() => setScale(s => Math.min(3, s + 0.25))}
-                className="px-3 py-1 bg-gray-200 hover:bg-gray-300 rounded text-sm font-medium"
-              >
-                +
-              </button>
+            {/* Scale controls and selection help */}
+            <div className="absolute top-4 right-4 z-10 flex flex-col gap-2">
+              <div className="flex gap-2 bg-white/90 backdrop-blur rounded-lg shadow-sm border p-2">
+                <button 
+                  onClick={() => setScale(s => Math.max(0.5, s - 0.25))}
+                  className="px-3 py-1 bg-gray-200 hover:bg-gray-300 rounded text-sm font-medium"
+                >
+                  -
+                </button>
+                <span className="px-3 py-1 text-sm font-medium">{Math.round(scale * 100)}%</span>
+                <button 
+                  onClick={() => setScale(s => Math.min(3, s + 0.25))}
+                  className="px-3 py-1 bg-gray-200 hover:bg-gray-300 rounded text-sm font-medium"
+                >
+                  +
+                </button>
+              </div>
+              
+              {/* Smart selection help */}
+              <div className="bg-blue-50/90 backdrop-blur rounded-lg shadow-sm border border-blue-200 p-2 text-xs text-blue-800 max-w-48">
+                <div className="font-medium mb-1">Smart Selection:</div>
+                <div>1× Click: Manual select</div>
+                <div>2× Click: Select word</div>
+                <div>3× Click: Select sentence</div>
+                <div>4× Click: Select paragraph</div>
+                <div>5× Click: Select all</div>
+              </div>
             </div>
             
             {/* Continuous PDF document */}
