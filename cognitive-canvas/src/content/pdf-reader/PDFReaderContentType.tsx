@@ -285,15 +285,11 @@ const PDFDocumentViewer = memo(({ pages, scale }: { pages: pdfjsLib.PDFPageProxy
             // Calculate centered X position
             const centeredX = textItem.x + (maxWidth - viewport.width) / 2 + pageHorizontalOffset;
             
-            // Measure text width for accurate positioning
-            textCtx.font = `${textItem.fontSize}px ${textItem.fontFamily}`;
-            const width = textCtx.measureText(textItem.str).width;
-            
             allVisibleTextItems.push({
               str: textItem.str,
               x: centeredX,
               y: relativeY,
-              width,
+              width: textItem.width, // Use the pre-calculated width
               height: textItem.fontSize,
               fontSize: textItem.fontSize,
               fontFamily: textItem.fontFamily,
