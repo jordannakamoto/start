@@ -7,6 +7,7 @@ from integrated_pdf_flow import process_pdf_with_search, search_processed_pdf
 from search_datastore import SearchDataStore
 from search_api import search_store
 from openai import AsyncOpenAI
+from enhanced_inference import EnhancedInferenceEngine
 
 # Initialize environment
 load_dotenv()
@@ -14,8 +15,10 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 if not OPENAI_API_KEY:
     print("Warning: OPENAI_API_KEY is not set in .env. Using mock responses.")
     openai_client = None
+    enhanced_engine = None
 else:
     openai_client = AsyncOpenAI(api_key=OPENAI_API_KEY)
+    enhanced_engine = EnhancedInferenceEngine(openai_client)
 
 # PocketFlow core classes
 from pocketflow import Flow, AsyncFlow, Node, BatchFlow, AsyncNode
@@ -188,31 +191,24 @@ async def summarize_pdf_with_citations(pdf_id: str) -> dict:
         
         context_text = "\n".join(context_segments)
         
-        if openai_client:
-            # Generate AI summary with citations
-            prompt = f"""Please provide a comprehensive summary of this PDF content. Include the citation references in your response using the exact format provided (e.g., [p1.para2.s3]).
-
-Context from PDF:
-{context_text}
-
-Instructions:
-1. Provide a structured summary with main points
-2. Include relevant citations after each point using the exact reference format
-3. Focus on the most important information
-4. Keep the summary concise but informative
-"""
-            
-            response = await openai_client.chat.completions.create(
-                model="gpt-4o-mini",
-                messages=[
-                    {"role": "system", "content": "You are an expert document summarizer. Always include citations in the exact format provided."},
-                    {"role": "user", "content": prompt}
-                ],
-                max_tokens=2000,  # Increased for better multipage summaries
-                temperature=0.3
-            )
-            
-            ai_summary = response.choices[0].message.content
+        if openai_client and enhanced_engine:
+            # Use enhanced inference engine for citation-aware analysis
+            try:
+                analysis_result = await enhanced_engine.analyze_document(key_results)
+                
+                # Use only the clean user summary (no metadata)
+                ai_summary = analysis_result['user_summary']
+                
+                # Log internal analysis for debugging (not shown to user)
+                print(f"🔍 Enhanced Analysis: {analysis_result['citation_count']} citations validated")
+                
+            except Exception as e:
+                print(f"Enhanced analysis failed, falling back to basic summary: {e}")
+                # Fallback to basic summarization
+                ai_summary = await _generate_basic_summary(context_text, openai_client)
+        elif openai_client:
+            # Fallback to basic summarization
+            ai_summary = await _generate_basic_summary(context_text, openai_client)
         else:
             # Mock summary when no API key
             ai_summary = f"""# PDF Summary
@@ -252,6 +248,32 @@ This document presents valuable information that contributes to understanding th
             "has_citations": False,
             "error": str(e)
         }
+
+async def _generate_basic_summary(context_text: str, openai_client) -> str:
+    """Fallback basic summarization function"""
+    prompt = f"""Please provide a comprehensive summary of this PDF content. Include the citation references in your response using the exact format provided (e.g., [p1.para2.s3]).
+
+Context from PDF:
+{context_text}
+
+Instructions:
+1. Provide a structured summary with main points
+2. Include relevant citations after each point using the exact reference format
+3. Focus on the most important information
+4. Keep the summary concise but informative
+"""
+    
+    response = await openai_client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[
+            {"role": "system", "content": "You are an expert document summarizer. Always include citations in the exact format provided."},
+            {"role": "user", "content": prompt}
+        ],
+        max_tokens=2000,
+        temperature=0.3
+    )
+    
+    return response.choices[0].message.content
 
 async def resolve_citation(pdf_id: str, citation: str) -> dict:
     """
