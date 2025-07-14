@@ -60,6 +60,10 @@ export class TextModel {
   private documentText: string = '';
   private charToItemMap: TextItem[] = [];
   private globalOffsetToPosition: Map<number, TextPosition> = new Map();
+  
+  // Spatial partitioning grid for fast hit-testing
+  private grid: Map<string, TextItem[]> = new Map();
+  private readonly GRID_SIZE = 100; // Grid cell size in pixels
 
   /**
    * Build text model from visual items
@@ -122,6 +126,7 @@ export class TextModel {
 
     this.documentText = documentText;
     this.buildPages();
+    this.buildGrid();
   }
 
   /**
@@ -181,13 +186,44 @@ export class TextModel {
   }
 
   /**
-   * Find closest item to coordinates
+   * Find closest item to coordinates using spatial grid
    */
   findItemNear(x: number, y: number): TextItem | null {
+    // Calculate grid cell for the given coordinates
+    const gridX = Math.floor(x / this.GRID_SIZE);
+    const gridY = Math.floor(y / this.GRID_SIZE);
+    const key = `${gridX},${gridY}`;
+    
+    // Get items from the target cell
+    const cellItems = this.grid.get(key);
+    
+    // If no items in the exact cell, check neighboring cells
+    const itemsToCheck: TextItem[] = [];
+    if (cellItems && cellItems.length > 0) {
+      itemsToCheck.push(...cellItems);
+    } else {
+      // Check 3x3 grid around the target cell
+      for (let dx = -1; dx <= 1; dx++) {
+        for (let dy = -1; dy <= 1; dy++) {
+          const neighborKey = `${gridX + dx},${gridY + dy}`;
+          const neighborItems = this.grid.get(neighborKey);
+          if (neighborItems) {
+            itemsToCheck.push(...neighborItems);
+          }
+        }
+      }
+    }
+    
+    // If still no items found, fall back to all items (shouldn't happen in practice)
+    if (itemsToCheck.length === 0) {
+      itemsToCheck.push(...this.items);
+    }
+    
+    // Find closest item among the candidates
     let closestItem: TextItem | null = null;
     let minDist = Infinity;
-
-    for (const item of this.items) {
+    
+    for (const item of itemsToCheck) {
       const centerX = item.x + item.width / 2;
       const centerY = item.y;
       const dist = Math.abs(x - centerX) + Math.abs(y - centerY) * 2;
@@ -197,7 +233,7 @@ export class TextModel {
         closestItem = item;
       }
     }
-
+    
     return closestItem;
   }
 
@@ -219,18 +255,40 @@ export class TextModel {
   }
 
   /**
-   * Get items in coordinate range
+   * Get items in coordinate range using spatial grid
    */
   getItemsInRegion(x1: number, y1: number, x2: number, y2: number): TextItem[] {
     const minX = Math.min(x1, x2);
     const maxX = Math.max(x1, x2);
     const minY = Math.min(y1, y2);
     const maxY = Math.max(y1, y2);
-
-    return this.items.filter(item =>
-      item.x + item.width >= minX && item.x <= maxX &&
-      item.y >= minY && item.y - item.height <= maxY
-    );
+    
+    // Calculate grid cell range
+    const startGridX = Math.floor(minX / this.GRID_SIZE);
+    const endGridX = Math.floor(maxX / this.GRID_SIZE);
+    const startGridY = Math.floor(minY / this.GRID_SIZE);
+    const endGridY = Math.floor(maxY / this.GRID_SIZE);
+    
+    // Collect items from all relevant grid cells
+    const itemSet = new Set<TextItem>();
+    
+    for (let gridX = startGridX; gridX <= endGridX; gridX++) {
+      for (let gridY = startGridY; gridY <= endGridY; gridY++) {
+        const key = `${gridX},${gridY}`;
+        const cellItems = this.grid.get(key);
+        if (cellItems) {
+          for (const item of cellItems) {
+            // Precise bounds check
+            if (item.x + item.width >= minX && item.x <= maxX &&
+                item.y >= minY && item.y - item.height <= maxY) {
+              itemSet.add(item);
+            }
+          }
+        }
+      }
+    }
+    
+    return Array.from(itemSet);
   }
 
   private clear(): void {
@@ -239,6 +297,33 @@ export class TextModel {
     this.documentText = '';
     this.charToItemMap = [];
     this.globalOffsetToPosition.clear();
+    this.grid.clear();
+  }
+
+  /**
+   * Build spatial partitioning grid for fast hit-testing
+   */
+  private buildGrid(): void {
+    this.grid.clear();
+    
+    for (const item of this.items) {
+      // Calculate the range of grid cells this item overlaps
+      const startX = Math.floor(item.x / this.GRID_SIZE);
+      const endX = Math.floor((item.x + item.width) / this.GRID_SIZE);
+      const startY = Math.floor((item.y - item.height) / this.GRID_SIZE);
+      const endY = Math.floor(item.y / this.GRID_SIZE);
+      
+      // Add item to all grid cells it overlaps
+      for (let gridX = startX; gridX <= endX; gridX++) {
+        for (let gridY = startY; gridY <= endY; gridY++) {
+          const key = `${gridX},${gridY}`;
+          if (!this.grid.has(key)) {
+            this.grid.set(key, []);
+          }
+          this.grid.get(key)!.push(item);
+        }
+      }
+    }
   }
 
   private shouldAddSpace(current: any, next: any): boolean {
