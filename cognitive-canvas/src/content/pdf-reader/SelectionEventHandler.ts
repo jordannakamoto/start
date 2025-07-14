@@ -177,8 +177,15 @@ export class SelectionEventHandler {
     const startAbsoluteY = this.selectionStart.y + scrollTop;
     const endAbsoluteY = y + scrollTop;
     
-    const startChar = this.fastSelection.coordsToChar(this.selectionStart.x, startAbsoluteY);
-    const endChar = this.fastSelection.coordsToChar(x, endAbsoluteY);
+    // Determine selection direction for better line-aware behavior
+    const isSelectingDown = endAbsoluteY > startAbsoluteY;
+    const isSelectingAcrossLines = Math.abs(endAbsoluteY - startAbsoluteY) > 10; // More than 10px vertical difference
+    
+    // Use line-aware coordinate conversion for better multi-line selection
+    const startChar = this.fastSelection.coordsToCharLineAware(this.selectionStart.x, startAbsoluteY, false);
+    
+    // For multi-line selection, use more aggressive line-aware behavior
+    const endChar = this.fastSelection.coordsToCharLineAware(x, endAbsoluteY, isSelectingAcrossLines);
     
     // Set selection immediately for fast response
     this.fastSelection.setSelection(startChar, endChar);

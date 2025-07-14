@@ -58,6 +58,14 @@ export class FastSelection {
   }
 
   /**
+   * Convert screen coordinates to character index with line-aware behavior
+   */
+  coordsToCharLineAware(x: number, y: number, isEndOfSelection: boolean = false): number {
+    const offset = this.textModel.coordinatesToOffsetLineAware(x, y, isEndOfSelection);
+    return offset || 0;
+  }
+
+  /**
    * Set selection by character range - delegates to SelectionAPI
    */
   setSelection(start: number, end: number): void {

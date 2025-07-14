@@ -255,6 +255,92 @@ export class TextModel {
   }
 
   /**
+   * Convert coordinates to character index with line-aware behavior
+   * for better multi-line selection
+   */
+  coordinatesToOffsetLineAware(x: number, y: number, isEndOfSelection: boolean = false): number | null {
+    const item = this.findItemNear(x, y);
+    if (!item) return null;
+
+    const relativeX = x - item.x;
+    const charWidth = item.width / item.str.length;
+    
+    // For end-of-selection behavior, be more aggressive about line selection
+    if (isEndOfSelection) {
+      const itemEndX = item.x + item.width;
+      const itemStartX = item.x;
+      
+      // If selecting significantly past the end of the text item, extend to line end
+      if (x > itemEndX + charWidth) {
+        const lineEndOffset = this.findLineEnd(item);
+        return lineEndOffset;
+      }
+      
+      // If selecting significantly before the start of the text item, extend to line start
+      if (x < itemStartX - charWidth) {
+        const lineStartOffset = this.findLineStart(item);
+        return lineStartOffset;
+      }
+      
+      // If selecting past the 3/4 point of the line, extend to line end
+      const lineThreeQuarters = itemStartX + (item.width * 0.75);
+      if (x > lineThreeQuarters) {
+        const lineEndOffset = this.findLineEnd(item);
+        return lineEndOffset;
+      }
+      
+      // If selecting before the 1/4 point of the line, extend to line start
+      const lineOneQuarter = itemStartX + (item.width * 0.25);
+      if (x < lineOneQuarter) {
+        const lineStartOffset = this.findLineStart(item);
+        return lineStartOffset;
+      }
+    }
+
+    // Normal character-precise selection
+    const charOffset = Math.max(0, Math.min(
+      Math.round(relativeX / charWidth),
+      item.str.length
+    ));
+
+    return item.charStart + charOffset;
+  }
+
+  /**
+   * Find the end of the line containing the given item
+   */
+  private findLineEnd(item: TextItem): number {
+    // Find all items on the same line
+    const sameLineItems = this.items.filter(otherItem => 
+      otherItem.pageIndex === item.pageIndex && 
+      Math.abs(otherItem.y - item.y) <= 5 // Same line tolerance
+    );
+    
+    // Sort by x position and get the last item
+    sameLineItems.sort((a, b) => a.x - b.x);
+    const lastItem = sameLineItems[sameLineItems.length - 1];
+    
+    return lastItem ? lastItem.charEnd : item.charEnd;
+  }
+
+  /**
+   * Find the start of the line containing the given item
+   */
+  private findLineStart(item: TextItem): number {
+    // Find all items on the same line
+    const sameLineItems = this.items.filter(otherItem => 
+      otherItem.pageIndex === item.pageIndex && 
+      Math.abs(otherItem.y - item.y) <= 5 // Same line tolerance
+    );
+    
+    // Sort by x position and get the first item
+    sameLineItems.sort((a, b) => a.x - b.x);
+    const firstItem = sameLineItems[0];
+    
+    return firstItem ? firstItem.charStart : item.charStart;
+  }
+
+  /**
    * Get items in coordinate range using spatial grid
    */
   getItemsInRegion(x1: number, y1: number, x2: number, y2: number): TextItem[] {
