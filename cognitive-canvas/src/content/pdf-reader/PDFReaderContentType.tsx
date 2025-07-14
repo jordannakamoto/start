@@ -31,6 +31,13 @@ interface PageInfo {
   offsetY: number;
 }
 
+interface VisiblePage {
+  pageIndex: number;
+  page: pdfjsLib.PDFPageProxy;
+  offsetY: number;
+  viewport: pdfjsLib.PageViewport;
+}
+
 // Configure PDF.js worker. This is essential.
 pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
   'pdfjs-dist/build/pdf.worker.min.mjs',
@@ -43,19 +50,69 @@ interface PDFContent {
   title?: string;
 }
 
-// Continuous PDF document viewer with natural scrolling
+// Virtualized PDF document viewer with natural scrolling
 const PDFDocumentViewer = memo(({ pages, scale }: { pages: pdfjsLib.PDFPageProxy[], scale: number }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const textCanvasRef = useRef<HTMLCanvasElement>(null);
   const selectionCanvasRef = useRef<HTMLCanvasElement>(null);
   const textLinesRef = useRef<TextItem[][]>([]);
   const pagesInfoRef = useRef<PageInfo[]>([]);
+  const visiblePagesRef = useRef<VisiblePage[]>([]);
   const isSelectingRef = useRef(false);
   const selectionStartRef = useRef<{x: number, y: number} | null>(null);
   const animationFrameRef = useRef<number | null>(null);
+  const scrollUpdateRef = useRef<number | null>(null);
   
   const [selection, setSelection] = useState<Selection | null>(null);
-  const [documentReady, setDocumentReady] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [visiblePages, setVisiblePages] = useState<VisiblePage[]>([]);
+  const [totalHeight, setTotalHeight] = useState(0);
+  const [maxWidth, setMaxWidth] = useState(0);
+
+  // Calculate which pages should be visible based on scroll position
+  const calculateVisiblePages = useCallback((scrollTop: number, containerHeight: number): VisiblePage[] => {
+    if (pagesInfoRef.current.length === 0) return [];
+    
+    const buffer = containerHeight; // Load 1 screen height before/after visible area
+    const viewportTop = scrollTop - buffer;
+    const viewportBottom = scrollTop + containerHeight + buffer;
+    
+    const visible: VisiblePage[] = [];
+    
+    for (const pageInfo of pagesInfoRef.current) {
+      const pageTop = pageInfo.offsetY;
+      const pageBottom = pageInfo.offsetY + pageInfo.height;
+      
+      // Check if page is in viewport (with buffer)
+      if (pageBottom >= viewportTop && pageTop <= viewportBottom) {
+        const page = pages[pageInfo.index];
+        const viewport = page.getViewport({ scale });
+        
+        visible.push({
+          pageIndex: pageInfo.index,
+          page,
+          offsetY: pageInfo.offsetY,
+          viewport
+        });
+      }
+    }
+    
+    return visible;
+  }, [pages, scale]);
+
+  // Calculate current page based on scroll position
+  const calculateCurrentPage = useCallback((scrollTop: number): number => {
+    if (pagesInfoRef.current.length === 0) return 1;
+    
+    for (let i = 0; i < pagesInfoRef.current.length; i++) {
+      const pageInfo = pagesInfoRef.current[i];
+      if (scrollTop < pageInfo.offsetY + pageInfo.height / 2) {
+        return i + 1;
+      }
+    }
+    
+    return pagesInfoRef.current.length;
+  }, []);
 
   const groupTextIntoLines = (items: TextItem[]): TextItem[][] => {
     const lines: TextItem[][] = [];
@@ -262,10 +319,50 @@ const PDFDocumentViewer = memo(({ pages, scale }: { pages: pdfjsLib.PDFPageProxy
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [handleKeyDown]);
 
-  // Render continuous document (only when pages or scale changes)
+  // Calculate document layout (only when pages or scale changes)
   useEffect(() => {
-    const renderDocument = async () => {
-      if (!textCanvasRef.current || !selectionCanvasRef.current || pages.length === 0) return;
+    const calculateLayout = async () => {
+      if (pages.length === 0) return;
+
+      // Calculate document dimensions and page positions
+      let docTotalHeight = 0;
+      let docMaxWidth = 0;
+      const pagesInfo: PageInfo[] = [];
+
+      for (let pageIndex = 0; pageIndex < pages.length; pageIndex++) {
+        const viewport = pages[pageIndex].getViewport({ scale });
+        
+        pagesInfo.push({
+          index: pageIndex,
+          width: viewport.width,
+          height: viewport.height,
+          offsetY: docTotalHeight
+        });
+        
+        docTotalHeight += viewport.height;
+        docMaxWidth = Math.max(docMaxWidth, viewport.width);
+      }
+
+      pagesInfoRef.current = pagesInfo;
+      setTotalHeight(docTotalHeight);
+      setMaxWidth(docMaxWidth);
+      
+      // Initial visible pages calculation
+      if (containerRef.current) {
+        const containerHeight = containerRef.current.clientHeight;
+        const initialVisible = calculateVisiblePages(0, containerHeight);
+        setVisiblePages(initialVisible);
+        visiblePagesRef.current = initialVisible;
+      }
+    };
+
+    calculateLayout();
+  }, [pages, scale, calculateVisiblePages]);
+
+  // Render visible pages only
+  useEffect(() => {
+    const renderVisiblePages = async () => {
+      if (!textCanvasRef.current || !selectionCanvasRef.current || visiblePages.length === 0) return;
 
       const textCanvas = textCanvasRef.current;
       const selectionCanvas = selectionCanvasRef.current;
@@ -274,40 +371,19 @@ const PDFDocumentViewer = memo(({ pages, scale }: { pages: pdfjsLib.PDFPageProxy
       
       if (!textCtx || !selectionCtx) return;
 
-      // Calculate document dimensions
-      let totalHeight = 0;
-      let maxWidth = 0;
-      const pagesInfo: PageInfo[] = [];
-
-      // First pass: calculate page positions and total dimensions
-      for (let pageIndex = 0; pageIndex < pages.length; pageIndex++) {
-        const viewport = pages[pageIndex].getViewport({ scale });
-        
-        pagesInfo.push({
-          index: pageIndex,
-          width: viewport.width,
-          height: viewport.height,
-          offsetY: totalHeight
-        });
-        
-        totalHeight += viewport.height;
-        maxWidth = Math.max(maxWidth, viewport.width);
-      }
-
-      pagesInfoRef.current = pagesInfo;
-
-      // Set canvas dimensions
+      // Set canvas to container size for virtualized rendering
+      const containerHeight = containerRef.current?.clientHeight || 800;
       const devicePixelRatio = window.devicePixelRatio || 1;
       
       textCanvas.width = maxWidth * devicePixelRatio;
-      textCanvas.height = totalHeight * devicePixelRatio;
+      textCanvas.height = containerHeight * devicePixelRatio;
       textCanvas.style.width = `${maxWidth}px`;
-      textCanvas.style.height = `${totalHeight}px`;
+      textCanvas.style.height = `${containerHeight}px`;
       
       selectionCanvas.width = maxWidth * devicePixelRatio;
-      selectionCanvas.height = totalHeight * devicePixelRatio;
+      selectionCanvas.height = containerHeight * devicePixelRatio;
       selectionCanvas.style.width = `${maxWidth}px`;
-      selectionCanvas.style.height = `${totalHeight}px`;
+      selectionCanvas.style.height = `${containerHeight}px`;
       
       textCtx.scale(devicePixelRatio, devicePixelRatio);
       selectionCtx.scale(devicePixelRatio, devicePixelRatio);
@@ -315,15 +391,16 @@ const PDFDocumentViewer = memo(({ pages, scale }: { pages: pdfjsLib.PDFPageProxy
 
       // Clear canvas
       textCtx.fillStyle = 'white';
-      textCtx.fillRect(0, 0, maxWidth, totalHeight);
+      textCtx.fillRect(0, 0, maxWidth, containerHeight);
 
-      // Render all pages
+      // Get scroll offset for coordinate transformation
+      const scrollTop = containerRef.current?.scrollTop || 0;
+
+      // Render visible pages
       const allItems: TextItem[] = [];
 
-      for (let pageIndex = 0; pageIndex < pages.length; pageIndex++) {
-        const page = pages[pageIndex];
-        const pageInfo = pagesInfo[pageIndex];
-        const viewport = page.getViewport({ scale });
+      for (const visiblePage of visiblePages) {
+        const { page, pageIndex, viewport, offsetY } = visiblePage;
         
         // Get text content for this page
         const textContent = await page.getTextContent();
@@ -334,56 +411,100 @@ const PDFDocumentViewer = memo(({ pages, scale }: { pages: pdfjsLib.PDFPageProxy
             const [a, , , , e, f] = item.transform;
             const fontSize = Math.abs(a) * scale;
             const x = e * scale + (maxWidth - viewport.width) / 2; // Center page horizontally
-            const y = (viewport.height - f * scale) + pageInfo.offsetY;
+            const y = (viewport.height - f * scale) + offsetY - scrollTop; // Adjust for scroll
             
-            // Measure text width
-            textCtx.font = `${fontSize}px ${item.fontName || 'serif'}`;
-            const width = textCtx.measureText(item.str).width;
-            
-            allItems.push({
-              str: item.str,
-              x,
-              y,
-              width,
-              height: fontSize,
-              fontSize,
-              fontFamily: item.fontName || 'serif',
-              transform: item.transform,
-              pageIndex
-            });
+            // Only process if within visible area
+            if (y > -fontSize && y < containerHeight + fontSize) {
+              // Measure text width
+              textCtx.font = `${fontSize}px ${item.fontName || 'serif'}`;
+              const width = textCtx.measureText(item.str).width;
+              
+              allItems.push({
+                str: item.str,
+                x,
+                y,
+                width,
+                height: fontSize,
+                fontSize,
+                fontFamily: item.fontName || 'serif',
+                transform: item.transform,
+                pageIndex
+              });
+            }
           }
         });
 
-        // Draw page separator line (subtle)
+        // Draw page separator line (subtle) - adjust for scroll
         if (pageIndex > 0) {
-          textCtx.strokeStyle = '#e0e0e0';
-          textCtx.lineWidth = 1;
-          textCtx.beginPath();
-          textCtx.moveTo(0, pageInfo.offsetY);
-          textCtx.lineTo(maxWidth, pageInfo.offsetY);
-          textCtx.stroke();
+          const separatorY = offsetY - scrollTop;
+          if (separatorY > 0 && separatorY < containerHeight) {
+            textCtx.strokeStyle = '#e0e0e0';
+            textCtx.lineWidth = 1;
+            textCtx.beginPath();
+            textCtx.moveTo(0, separatorY);
+            textCtx.lineTo(maxWidth, separatorY);
+            textCtx.stroke();
+          }
         }
       }
 
       const lines = groupTextIntoLines(allItems);
       textLinesRef.current = lines;
 
-      // Render all text
+      // Render text
       textCtx.fillStyle = '#333';
       allItems.forEach(item => {
         textCtx.font = `${item.fontSize}px ${item.fontFamily}`;
         textCtx.fillText(item.str, item.x, item.y);
       });
-
-      setDocumentReady(true);
     };
 
-    renderDocument();
-  }, [pages, scale]);
+    renderVisiblePages();
+  }, [visiblePages, scale, maxWidth]);
+
+  // Handle scroll events
+  useEffect(() => {
+    const handleScroll = () => {
+      if (!containerRef.current) return;
+      
+      // Cancel previous update
+      if (scrollUpdateRef.current) {
+        cancelAnimationFrame(scrollUpdateRef.current);
+      }
+      
+      // Throttle scroll updates
+      scrollUpdateRef.current = requestAnimationFrame(() => {
+        const scrollTop = containerRef.current!.scrollTop;
+        const containerHeight = containerRef.current!.clientHeight;
+        
+        // Update current page
+        const newCurrentPage = calculateCurrentPage(scrollTop);
+        setCurrentPage(newCurrentPage);
+        
+        // Update visible pages
+        const newVisiblePages = calculateVisiblePages(scrollTop, containerHeight);
+        
+        // Only update if visible pages changed
+        const visiblePageIndices = newVisiblePages.map(p => p.pageIndex).sort();
+        const currentVisibleIndices = visiblePagesRef.current.map(p => p.pageIndex).sort();
+        
+        if (JSON.stringify(visiblePageIndices) !== JSON.stringify(currentVisibleIndices)) {
+          setVisiblePages(newVisiblePages);
+          visiblePagesRef.current = newVisiblePages;
+        }
+      });
+    };
+
+    const container = containerRef.current;
+    if (container) {
+      container.addEventListener('scroll', handleScroll, { passive: true });
+      return () => container.removeEventListener('scroll', handleScroll);
+    }
+  }, [calculateCurrentPage, calculateVisiblePages]);
 
   // Update selection layer only when selection changes
   useEffect(() => {
-    if (!documentReady || !selectionCanvasRef.current) return;
+    if (!selectionCanvasRef.current) return;
     
     const ctx = selectionCanvasRef.current.getContext('2d');
     if (!ctx) return;
@@ -393,19 +514,26 @@ const PDFDocumentViewer = memo(({ pages, scale }: { pages: pdfjsLib.PDFPageProxy
     } else {
       ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
     }
-  }, [selection, documentReady, drawSelection]);
+  }, [selection, drawSelection]);
 
   return (
     <div ref={containerRef} className="relative w-full h-full overflow-auto bg-gray-100">
-      <div className="flex justify-center p-4">
-        <div className="relative shadow-lg bg-white">
-          {/* Text layer - static, only re-renders on pages/scale change */}
+      {/* Invisible scroll spacer to create proper scroll height */}
+      <div style={{ height: totalHeight, width: 1, position: 'absolute', left: 0, top: 0, pointerEvents: 'none' }} />
+      
+      {/* Fixed canvas container centered in viewport */}
+      <div 
+        className="sticky top-0 left-0 flex justify-center"
+        style={{ height: '100vh', pointerEvents: 'none' }}
+      >
+        <div className="relative shadow-lg bg-white" style={{ pointerEvents: 'auto' }}>
+          {/* Text layer - virtualized, only shows visible pages */}
           <canvas
             ref={textCanvasRef}
             className="block"
             style={{ position: 'absolute', top: 0, left: 0 }}
           />
-          {/* Selection layer - transparent, only re-renders on selection change */}
+          {/* Selection layer - transparent overlay */}
           <canvas
             ref={selectionCanvasRef}
             className="block cursor-text"
@@ -415,13 +543,20 @@ const PDFDocumentViewer = memo(({ pages, scale }: { pages: pdfjsLib.PDFPageProxy
             onMouseUp={handleMouseUp}
             onMouseLeave={handleMouseUp}
           />
-          {selection && (
-            <div className="absolute top-2 left-2 text-xs text-gray-600 bg-yellow-100 px-2 py-1 rounded shadow">
-              Selected: {getSelectedText().length} chars
-            </div>
-          )}
         </div>
       </div>
+
+      {/* Page indicator */}
+      <div className="fixed bottom-4 right-4 bg-black/70 text-white px-3 py-1 rounded text-sm font-medium">
+        Page {currentPage} of {pages.length}
+      </div>
+
+      {/* Selection indicator */}
+      {selection && (
+        <div className="fixed top-4 left-4 text-xs text-gray-700 bg-yellow-200 px-2 py-1 rounded shadow border">
+          Selected: {getSelectedText().length} chars
+        </div>
+      )}
     </div>
   );
 });
