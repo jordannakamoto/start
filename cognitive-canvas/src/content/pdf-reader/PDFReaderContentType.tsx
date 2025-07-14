@@ -103,7 +103,8 @@ const PDFDocumentViewer = memo(({ pages, scale }: { pages: pdfjsLib.PDFPageProxy
   }, []);
 
   const drawSelection = useCallback((ctx: CanvasRenderingContext2D) => {
-    const rects = fastSelectionRef.current.getSelectionRects();
+    const scrollTop = containerRef.current?.scrollTop || 0;
+    const rects = fastSelectionRef.current.getSelectionRects(scrollTop);
     if (rects.length === 0) return;
     
     ctx.fillStyle = 'rgba(0, 123, 255, 0.3)';
@@ -164,6 +165,11 @@ const PDFDocumentViewer = memo(({ pages, scale }: { pages: pdfjsLib.PDFPageProxy
     // Set canvas elements when available
     if (textCanvasRef.current && selectionCanvasRef.current && eventHandlerRef.current) {
       eventHandlerRef.current.setCanvasElements(textCanvasRef.current, selectionCanvasRef.current);
+    }
+    
+    // Set container reference for scroll position access
+    if (containerRef.current && eventHandlerRef.current) {
+      eventHandlerRef.current.setContainerRef(containerRef.current);
     }
     
     return () => {
@@ -303,6 +309,7 @@ const PDFDocumentViewer = memo(({ pages, scale }: { pages: pdfjsLib.PDFPageProxy
 
       // Render visible pages using pre-rendered text
       const allVisibleTextItems: any[] = [];
+      const textItemsForRendering: any[] = [];
 
       for (const visiblePage of visiblePages) {
         const { pageIndex, viewport, offsetY } = visiblePage;
@@ -323,16 +330,28 @@ const PDFDocumentViewer = memo(({ pages, scale }: { pages: pdfjsLib.PDFPageProxy
             // Calculate centered X position
             const centeredX = textItem.x + (maxWidth - viewport.width) / 2 + pageHorizontalOffset;
             
+            // For FastSelection: store absolute coordinates
+            // This ensures the selection model has a consistent coordinate system
+            // Mouse coordinates will be transformed to absolute in SelectionEventHandler
             allVisibleTextItems.push({
               str: textItem.str,
               x: centeredX,
-              y: relativeY,
-              width: textItem.width, // Use the pre-calculated width
+              y: absoluteY, // Use absolute Y coordinate
+              width: textItem.width,
               height: textItem.fontSize,
               fontSize: textItem.fontSize,
               fontFamily: textItem.fontFamily,
               pageIndex: textItem.pageIndex,
               globalCharIndex: 0 // Will be set during SelectionAPI initialization
+            });
+            
+            // For text rendering: store viewport-relative coordinates
+            textItemsForRendering.push({
+              str: textItem.str,
+              x: centeredX,
+              y: relativeY, // Use viewport-relative Y coordinate
+              fontSize: textItem.fontSize,
+              fontFamily: textItem.fontFamily
             });
           }
         }
@@ -361,7 +380,7 @@ const PDFDocumentViewer = memo(({ pages, scale }: { pages: pdfjsLib.PDFPageProxy
 
       // Render all text directly to text canvas
       textCtx.fillStyle = '#1a1a1a';
-      allVisibleTextItems.forEach(item => {
+      textItemsForRendering.forEach(item => {
         textCtx.font = `${item.fontSize}px ${item.fontFamily}`;
         textCtx.fillText(item.str, item.x, item.y);
       });

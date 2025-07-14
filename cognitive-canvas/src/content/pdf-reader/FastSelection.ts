@@ -75,13 +75,13 @@ export class FastSelection {
   /**
    * Get selection rectangles for GPU rendering - delegates to SelectionAPI
    */
-  getSelectionRects(): SelectionRect[] {
+  getSelectionRects(scrollTop: number = 0): SelectionRect[] {
     if (!this.currentSelection) return [];
     
     const bounds = this.selectionAPI.getSelectionBounds();
     return bounds.rects.map(rect => ({
       x: rect.x,
-      y: rect.y,
+      y: rect.y - scrollTop,
       width: rect.width,
       height: rect.height
     }));

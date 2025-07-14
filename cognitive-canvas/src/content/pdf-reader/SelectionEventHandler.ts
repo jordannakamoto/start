@@ -28,6 +28,7 @@ export class SelectionEventHandler {
   private textCanvas: HTMLCanvasElement | null = null;
   private selectionCanvas: HTMLCanvasElement | null = null;
   private selectionCanvasCtx: CanvasRenderingContext2D | null = null;
+  private containerRef: HTMLDivElement | null = null;
   
   // Event listeners cleanup
   private cleanup: (() => void)[] = [];
@@ -61,6 +62,13 @@ export class SelectionEventHandler {
   }
 
   /**
+   * Set container reference for scroll position access
+   */
+  setContainerRef(containerRef: HTMLDivElement | null): void {
+    this.containerRef = containerRef;
+  }
+
+  /**
    * MOUSE EVENT HANDLERS
    */
 
@@ -86,7 +94,8 @@ export class SelectionEventHandler {
     this.fastSelection.clearSelection();
     
     // Draw initial selection point immediately
-    this.drawCurrentSelection();
+    const scrollTop = this.containerRef?.scrollTop || 0;
+    this.drawCurrentSelection(scrollTop);
     
     // Notify React state
     this.options.onSelectionChange?.(null);
@@ -105,7 +114,8 @@ export class SelectionEventHandler {
     this.updateSelection(x, y);
     
     // Draw selection immediately for zero-latency feedback
-    this.drawCurrentSelection();
+    const scrollTop = this.containerRef?.scrollTop || 0;
+    this.drawCurrentSelection(scrollTop);
     
     // Throttle React state updates
     if (this.animationFrame) {
@@ -162,8 +172,13 @@ export class SelectionEventHandler {
   private updateSelection(x: number, y: number): void {
     if (!this.selectionStart) return;
     
-    const startChar = this.fastSelection.coordsToChar(this.selectionStart.x, this.selectionStart.y);
-    const endChar = this.fastSelection.coordsToChar(x, y);
+    // Convert viewport-relative coordinates to absolute document coordinates
+    const scrollTop = this.containerRef?.scrollTop || 0;
+    const startAbsoluteY = this.selectionStart.y + scrollTop;
+    const endAbsoluteY = y + scrollTop;
+    
+    const startChar = this.fastSelection.coordsToChar(this.selectionStart.x, startAbsoluteY);
+    const endChar = this.fastSelection.coordsToChar(x, endAbsoluteY);
     
     // Set selection immediately for fast response
     this.fastSelection.setSelection(startChar, endChar);
@@ -172,7 +187,7 @@ export class SelectionEventHandler {
   /**
    * Draw current selection directly to canvas for zero-latency feedback
    */
-  private drawCurrentSelection(): void {
+  private drawCurrentSelection(scrollTop: number = 0): void {
     if (!this.selectionCanvasCtx || !this.selectionCanvas) return;
     
     const ctx = this.selectionCanvasCtx;
@@ -180,8 +195,8 @@ export class SelectionEventHandler {
     // Clear the entire selection canvas
     ctx.clearRect(0, 0, this.selectionCanvas.width, this.selectionCanvas.height);
     
-    // Get selection rectangles
-    const rects = this.fastSelection.getSelectionRects();
+    // Get selection rectangles with scroll offset
+    const rects = this.fastSelection.getSelectionRects(scrollTop);
     if (rects.length === 0) return;
     
     // Draw selection rectangles
@@ -220,7 +235,10 @@ export class SelectionEventHandler {
    * Convert screen coordinates to character index
    */
   coordsToChar(x: number, y: number): number {
-    return this.fastSelection.coordsToChar(x, y);
+    // Convert viewport-relative coordinates to absolute document coordinates
+    const scrollTop = this.containerRef?.scrollTop || 0;
+    const absoluteY = y + scrollTop;
+    return this.fastSelection.coordsToChar(x, absoluteY);
   }
 
   /**
@@ -228,17 +246,26 @@ export class SelectionEventHandler {
    */
 
   selectWordAt(x: number, y: number): Selection | null {
-    const offset = this.coordsToChar(x, y);
+    // Convert viewport-relative coordinates to absolute document coordinates
+    const scrollTop = this.containerRef?.scrollTop || 0;
+    const absoluteY = y + scrollTop;
+    const offset = this.fastSelection.coordsToChar(x, absoluteY);
     return this.fastSelection.selectWordAt(offset);
   }
 
   selectSentenceAt(x: number, y: number): Selection | null {
-    const offset = this.coordsToChar(x, y);
+    // Convert viewport-relative coordinates to absolute document coordinates
+    const scrollTop = this.containerRef?.scrollTop || 0;
+    const absoluteY = y + scrollTop;
+    const offset = this.fastSelection.coordsToChar(x, absoluteY);
     return this.fastSelection.selectSentenceAt(offset);
   }
 
   selectLineAt(x: number, y: number): Selection | null {
-    const offset = this.coordsToChar(x, y);
+    // Convert viewport-relative coordinates to absolute document coordinates
+    const scrollTop = this.containerRef?.scrollTop || 0;
+    const absoluteY = y + scrollTop;
+    const offset = this.fastSelection.coordsToChar(x, absoluteY);
     return this.fastSelection.selectLineAt(offset);
   }
 
