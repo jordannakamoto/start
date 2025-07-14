@@ -9,6 +9,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { pdfHighlight } from '../../services/ContentCommunicationService';
 
 // --- Reusable Icon Components for a cleaner look ---
 const BotIcon = (props: React.SVGProps<SVGSVGElement>) => (
@@ -123,15 +124,106 @@ function AIAssistantEditor({ documentId, content, onContentChange }: ContentEdit
     }
   };
 
+  // Test function to demonstrate highlight API
+  const testHighlightAPI = useCallback(async () => {
+    try {
+      const result = await pdfHighlight.test();
+      
+      if (result.success) {
+        const highlightInfo = `
+🎉 Highlight API Test Successful!
+
+${result.message}
+
+📄 Available PDF Documents: ${result.availableDocuments.length}
+${result.availableDocuments.map(doc => 
+  `• ${doc.documentId}: ${doc.hasContent ? '✅ Has content' : '❌ No content'} (${doc.stats.totalHighlights} highlights)`
+).join('\n')}
+
+${result.demonstrationResults ? `
+🖍️ Test Results:
+• ${result.demonstrationResults.data?.message || 'Test completed'}
+• Highlighted text: "${result.demonstrationResults.data?.highlightedText || 'N/A'}"
+• Position: ${result.demonstrationResults.data?.position || 'N/A'}
+• Highlight ID: ${result.demonstrationResults.data?.highlightId || 'N/A'}
+• Total highlights: ${result.demonstrationResults.data?.stats?.totalHighlights || 0}
+• Colors used: ${Object.keys(result.demonstrationResults.data?.stats?.highlightsByColor || {}).length}
+
+💡 You should now see a yellow highlight on the PDF document!
+Check the browser console for debug logs.
+` : ''}
+
+📚 API Usage Examples:
+\`\`\`javascript
+// Test the system
+await pdfHighlight.test();
+
+// Add highlight to document
+await pdfHighlight.add('doc123', 10, 50, { 
+  color: '#FFFF0080', 
+  note: 'Important section!' 
+});
+
+// Find and highlight text
+await pdfHighlight.findAndHighlight('doc123', /pattern/gi, {
+  color: '#00FF0080'
+});
+
+// Export all highlights
+const exported = await pdfHighlight.export('doc123');
+
+// Get available documents
+const docs = pdfHighlight.getDocuments();
+\`\`\`
+
+✅ System is ready for external service integration!
+        `;
+        
+        addMessage('assistant', highlightInfo);
+      } else {
+        addMessage('assistant', `
+❌ Highlight API Test Failed
+
+${result.message}
+
+📄 Available PDF Documents: ${result.availableDocuments.length}
+${result.availableDocuments.map(doc => 
+  `• ${doc.documentId}: ${doc.hasContent ? '✅ Has content' : '❌ No content'}`
+).join('\n')}
+
+💡 To test the highlight system:
+1. Open a PDF document in another tab
+2. Wait for it to load completely
+3. Try the test button again
+
+The highlight API is ready, but needs an active PDF document to demonstrate on.
+        `);
+      }
+      
+    } catch (error) {
+      addMessage('assistant', `❌ Error testing highlight API: ${error}\n\nThe communication service may not be properly initialized.`);
+    }
+  }, [addMessage]);
+
   return (
     <Card className="h-full flex flex-col w-full !rounded-none !border-0">
-      <CardHeader className="flex flex-row items-center border-b">
+      <CardHeader className="flex flex-row items-center justify-between border-b">
         <div className="flex items-center space-x-4">
           <div>
             <p className="text-sm font-medium leading-none">AI Assistant</p>
             <p className="text-sm text-muted-foreground">Online</p>
           </div>
         </div>
+        
+        {/* Test highlight button */}
+        <Button
+          onClick={testHighlightAPI}
+          variant="outline"
+          size="sm"
+          className="text-xs"
+        >
+          🖍️ Test Highlight API
+        </Button>
       </CardHeader>
       
       <CardContent className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6">

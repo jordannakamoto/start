@@ -4,6 +4,7 @@
 
 import { TextModel } from './TextModel';
 import { SelectionAPI, Selection } from './SelectionAPI';
+import { HighlightAPI, Highlight, HighlightOptions } from './HighlightAPI';
 
 export interface SelectionRect {
   x: number;
@@ -20,12 +21,14 @@ export interface SelectionRect {
 export class FastSelection {
   private textModel: TextModel;
   private selectionAPI: SelectionAPI;
+  private highlightAPI: HighlightAPI;
   private currentSelection: Selection | null = null;
   private listeners: ((selection: Selection | null) => void)[] = [];
 
   constructor() {
     this.textModel = new TextModel();
     this.selectionAPI = new SelectionAPI(this.textModel);
+    this.highlightAPI = new HighlightAPI(this.textModel);
     
     // Listen to SelectionAPI changes and forward primary selection
     this.selectionAPI.onSelectionChange((_selections) => {
@@ -169,6 +172,55 @@ export class FastSelection {
    */
   getSelectionAPI(): SelectionAPI {
     return this.selectionAPI;
+  }
+
+  /**
+   * Get HighlightAPI instance for highlight operations
+   */
+  getHighlightAPI(): HighlightAPI {
+    return this.highlightAPI;
+  }
+
+  /**
+   * HIGHLIGHT CONVENIENCE METHODS
+   */
+
+  /**
+   * Highlight current selection
+   */
+  highlightSelection(options: HighlightOptions = {}): Highlight | null {
+    const selection = this.getSelection();
+    if (!selection) return null;
+
+    return this.highlightAPI.addHighlight(selection.start, selection.end, options);
+  }
+
+  /**
+   * Highlight text range
+   */
+  highlightRange(start: number, end: number, options: HighlightOptions = {}): Highlight {
+    return this.highlightAPI.addHighlight(start, end, options);
+  }
+
+  /**
+   * Remove highlight by ID
+   */
+  removeHighlight(id: string): boolean {
+    return this.highlightAPI.removeHighlight(id);
+  }
+
+  /**
+   * Get all highlights
+   */
+  getAllHighlights(): Highlight[] {
+    return this.highlightAPI.getAllHighlights();
+  }
+
+  /**
+   * Find and highlight text pattern
+   */
+  findAndHighlight(pattern: string | RegExp, options: HighlightOptions = {}): Highlight[] {
+    return this.highlightAPI.highlightText(pattern, options);
   }
 
   private notifyListeners(): void {

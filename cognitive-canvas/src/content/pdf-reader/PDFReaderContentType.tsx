@@ -9,6 +9,8 @@ import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from '
 import { FastSelection } from './FastSelection';
 import { Selection } from './SelectionAPI';
 import { SelectionEventHandler } from './SelectionEventHandler';
+import { Highlight, HighlightAPI } from './HighlightAPI';
+import { contentCommunicationService } from '../../services/ContentCommunicationService';
 
 // Fast selection system - speed optimized
 
@@ -39,10 +41,11 @@ interface PDFContent {
 }
 
 // Virtualized PDF document viewer with natural scrolling and double buffering
-const PDFDocumentViewer = memo(({ pages, scale }: { pages: pdfjsLib.PDFPageProxy[], scale: number }) => {
+const PDFDocumentViewer = memo(({ pages, scale, documentId }: { pages: pdfjsLib.PDFPageProxy[], scale: number, documentId: string }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const textCanvasRef = useRef<HTMLCanvasElement>(null);
   const selectionCanvasRef = useRef<HTMLCanvasElement>(null);
+  const highlightCanvasRef = useRef<HTMLCanvasElement>(null);
   const fastSelectionRef = useRef<FastSelection>(new FastSelection());
   const eventHandlerRef = useRef<SelectionEventHandler | null>(null);
   const pagesInfoRef = useRef<PageInfo[]>([]);
@@ -52,6 +55,7 @@ const PDFDocumentViewer = memo(({ pages, scale }: { pages: pdfjsLib.PDFPageProxy
   const scrollUpdateRef = useRef<number | null>(null);
   const selectionUpdateRef = useRef<number | null>(null);
   const [selection, setSelection] = useState<Selection | null>(null);
+  const [highlights, setHighlights] = useState<Highlight[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [visiblePages, setVisiblePages] = useState<VisiblePage[]>([]);
   const [selectionPages, setSelectionPages] = useState<VisiblePage[]>([]);
@@ -149,9 +153,29 @@ const PDFDocumentViewer = memo(({ pages, scale }: { pages: pdfjsLib.PDFPageProxy
     }
   }, []);
 
+  const drawHighlights = useCallback((ctx: CanvasRenderingContext2D) => {
+    const scrollTop = containerRef.current?.scrollTop || 0;
+    const highlightAPI = fastSelectionRef.current.getHighlightAPI();
+    const rects = highlightAPI.getHighlightRects(scrollTop);
+    
+    if (rects.length === 0) return;
+    
+    // Draw all highlight rectangles
+    for (const rect of rects) {
+      ctx.fillStyle = rect.color;
+      ctx.fillRect(rect.x, rect.y, rect.width, rect.height);
+    }
+    
+    // Debug: Log when highlights are drawn
+    if (rects.length > 0) {
+      console.log(`Drawing ${rects.length} highlights:`, rects);
+    }
+  }, []);
+
   const getSelectedText = useCallback((): string => {
     return fastSelectionRef.current.getSelectedText();
   }, []);
+
 
   // Throttled selection state update for React
   const handleSelectionChange = useCallback((newSelection: Selection | null) => {
@@ -179,7 +203,7 @@ const PDFDocumentViewer = memo(({ pages, scale }: { pages: pdfjsLib.PDFPageProxy
     setSelection(finalSelection);
   }, []);
 
-  // Initialize event handler
+  // Initialize event handler and highlight tracking
   useEffect(() => {
     if (!eventHandlerRef.current && selectionCanvasRef.current) {
       const selectionCtx = selectionCanvasRef.current.getContext('2d');
@@ -205,6 +229,77 @@ const PDFDocumentViewer = memo(({ pages, scale }: { pages: pdfjsLib.PDFPageProxy
     if (containerRef.current && eventHandlerRef.current) {
       eventHandlerRef.current.setContainerRef(containerRef.current);
     }
+
+    // Setup highlight change listener
+    const highlightAPI = fastSelectionRef.current.getHighlightAPI();
+    const unsubscribeHighlights = highlightAPI.onHighlightChange((event) => {
+      console.log('Highlight change event:', event);
+      const allHighlights = highlightAPI.getAllHighlights();
+      console.log('Setting highlights state:', allHighlights);
+      setHighlights(allHighlights);
+    });
+
+    // Register PDF reader with communication service
+    const pdfReaderInstance = {
+      textModel: fastSelectionRef.current.getTextModel(),
+      selectionAPI: fastSelectionRef.current.getSelectionAPI(),
+      highlightAPI: fastSelectionRef.current.getHighlightAPI(),
+      fastSelection: fastSelectionRef.current,
+      highlight: {
+        addByRange: (start: number, end: number, options?: any) => 
+          fastSelectionRef.current.getHighlightAPI().addHighlight(start, end, options),
+        addCurrent: (options?: any) => 
+          fastSelectionRef.current.highlightSelection(options),
+        findAndHighlight: (pattern: string | RegExp, options?: any) => 
+          fastSelectionRef.current.findAndHighlight(pattern, options),
+        remove: (id: string) => 
+          fastSelectionRef.current.getHighlightAPI().removeHighlight(id),
+        getAll: () => 
+          fastSelectionRef.current.getHighlightAPI().getAllHighlights(),
+        export: () => 
+          fastSelectionRef.current.getHighlightAPI().exportHighlights(),
+        import: (highlights: any[]) => 
+          fastSelectionRef.current.getHighlightAPI().importHighlights(highlights),
+        clear: () => 
+          fastSelectionRef.current.getHighlightAPI().clearAllHighlights(),
+        onChange: (listener: any) => 
+          fastSelectionRef.current.getHighlightAPI().onHighlightChange(listener),
+        getStats: () => 
+          fastSelectionRef.current.getHighlightAPI().getStats()
+      },
+      selection: {
+        set: (start: number, end: number) => 
+          fastSelectionRef.current.setSelection(start, end),
+        get: () => 
+          fastSelectionRef.current.getSelection(),
+        clear: () => 
+          fastSelectionRef.current.clearSelection(),
+        getText: () => 
+          fastSelectionRef.current.getSelectedText(),
+        selectWord: (offset: number) => 
+          fastSelectionRef.current.selectWordAt(offset),
+        selectSentence: (offset: number) => 
+          fastSelectionRef.current.selectSentenceAt(offset),
+        selectLine: (offset: number) => 
+          fastSelectionRef.current.selectLineAt(offset),
+        selectAll: () => 
+          fastSelectionRef.current.selectAll()
+      },
+      coordsToChar: (x: number, y: number, anchorX?: number, anchorY?: number) => 
+        fastSelectionRef.current.coordsToChar(x, y, anchorX, anchorY),
+      text: {
+        getDocument: () => 
+          fastSelectionRef.current.getTextModel().getDocumentText(),
+        getText: (start: number, end: number) => 
+          fastSelectionRef.current.getTextModel().getText(start, end),
+        getLength: () => 
+          fastSelectionRef.current.getTextModel().getLength(),
+        getPages: () => 
+          fastSelectionRef.current.getTextModel().getPages()
+      }
+    };
+
+    contentCommunicationService.registerPDFReader(documentId, pdfReaderInstance);
     
     return () => {
       if (eventHandlerRef.current) {
@@ -216,6 +311,8 @@ const PDFDocumentViewer = memo(({ pages, scale }: { pages: pdfjsLib.PDFPageProxy
         cancelAnimationFrame(selectionUpdateRef.current);
         selectionUpdateRef.current = null;
       }
+      unsubscribeHighlights();
+      contentCommunicationService.unregisterPDFReader(documentId);
     };
   }, [handleSelectionChange, handleSelectionEnd]);
 
@@ -437,6 +534,60 @@ const PDFDocumentViewer = memo(({ pages, scale }: { pages: pdfjsLib.PDFPageProxy
     renderTextLayer();
   }, [visiblePages, selectionPages, scale, maxWidth, scrollPosition]);
 
+  // Separate effect for highlight rendering (performance optimized)
+  useEffect(() => {
+    console.log('Highlight rendering effect triggered:', {
+      highlightsCount: highlights.length,
+      highlights: highlights,
+      visiblePagesCount: visiblePages.length,
+      scrollPosition
+    });
+
+    const renderHighlights = () => {
+      if (!highlightCanvasRef.current || !containerRef.current) {
+        console.log('Missing highlight canvas or container ref');
+        return;
+      }
+
+      const highlightCanvas = highlightCanvasRef.current;
+      const highlightCtx = highlightCanvas.getContext('2d');
+      if (!highlightCtx) {
+        console.log('Could not get highlight canvas context');
+        return;
+      }
+
+      // Get container dimensions
+      const containerWidth = containerRef.current.clientWidth;
+      const containerHeight = containerRef.current.clientHeight;
+      const devicePixelRatio = window.devicePixelRatio || 1;
+      
+      console.log('Setting up highlight canvas:', {
+        containerWidth,
+        containerHeight,
+        devicePixelRatio
+      });
+      
+      // Setup highlight canvas to match text canvas exactly
+      highlightCanvas.width = containerWidth * devicePixelRatio;
+      highlightCanvas.height = containerHeight * devicePixelRatio;
+      highlightCanvas.style.width = `${containerWidth}px`;
+      highlightCanvas.style.height = `${containerHeight}px`;
+      
+      highlightCtx.scale(devicePixelRatio, devicePixelRatio);
+
+      // Clear highlight canvas
+      highlightCtx.clearRect(0, 0, containerWidth, containerHeight);
+      console.log('Cleared highlight canvas');
+
+      // Render highlights
+      console.log('About to draw highlights...');
+      drawHighlights(highlightCtx);
+      console.log('Finished drawing highlights');
+    };
+
+    renderHighlights();
+  }, [highlights, drawHighlights, visiblePages, scrollPosition]);
+
   // Separate effect for selection rendering (performance optimized)
   useEffect(() => {
     const renderSelection = () => {
@@ -565,7 +716,7 @@ const PDFDocumentViewer = memo(({ pages, scale }: { pages: pdfjsLib.PDFPageProxy
         className="sticky top-0 left-0 w-full"
         style={{ height: '100vh', pointerEvents: 'none' }}
       >
-        {/* Text layer - virtualized, only shows visible pages */}
+        {/* Text layer - virtualized, only shows visible pages (BOTTOM LAYER) */}
         <canvas
           ref={textCanvasRef}
           className="block"
@@ -573,6 +724,23 @@ const PDFDocumentViewer = memo(({ pages, scale }: { pages: pdfjsLib.PDFPageProxy
             position: 'absolute', 
             top: 0, 
             left: 0, 
+            zIndex: 0,
+            pointerEvents: 'none',
+            userSelect: 'none',
+            WebkitUserSelect: 'none',
+            MozUserSelect: 'none',
+            msUserSelect: 'none'
+          }}
+        />
+        {/* Highlight layer - shows all highlights ABOVE text */}
+        <canvas
+          ref={highlightCanvasRef}
+          className="block"
+          style={{ 
+            position: 'absolute', 
+            top: 0, 
+            left: 0, 
+            zIndex: 1,
             pointerEvents: 'none',
             userSelect: 'none',
             WebkitUserSelect: 'none',
@@ -588,6 +756,7 @@ const PDFDocumentViewer = memo(({ pages, scale }: { pages: pdfjsLib.PDFPageProxy
             position: 'absolute', 
             top: 0, 
             left: 0, 
+            zIndex: 2,
             pointerEvents: 'auto',
             userSelect: 'none',
             WebkitUserSelect: 'none',
@@ -625,7 +794,7 @@ const PDFDocumentViewer = memo(({ pages, scale }: { pages: pdfjsLib.PDFPageProxy
   );
 });
 
-const PDFReaderEditor = memo<ContentEditorProps>(({ content, onContentChange, onTitleChange, readOnly, isActive }: ContentEditorProps) => {
+const PDFReaderEditor = memo<ContentEditorProps>(({ documentId, content, onContentChange, onTitleChange, readOnly, isActive }: ContentEditorProps) => {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [, setPdfDocument] = useState<pdfjsLib.PDFDocumentProxy | null>(null);
@@ -774,7 +943,7 @@ const PDFReaderEditor = memo<ContentEditorProps>(({ content, onContentChange, on
       >
         {pages.length > 0 && (
           <>
-            {/* Scale controls and selection help */}
+            {/* Scale controls */}
             <div className="absolute top-4 right-4 z-10 flex flex-col gap-2">
               <div className="flex gap-2 bg-white/90 backdrop-blur rounded-lg shadow-sm border p-2">
                 <button 
@@ -796,7 +965,8 @@ const PDFReaderEditor = memo<ContentEditorProps>(({ content, onContentChange, on
             {/* Continuous PDF document */}
             <PDFDocumentViewer 
               pages={pages} 
-              scale={scale} 
+              scale={scale}
+              documentId={documentId}
             />
           </>
         )}
