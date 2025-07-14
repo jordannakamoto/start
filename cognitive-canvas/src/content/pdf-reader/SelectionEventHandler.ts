@@ -30,6 +30,7 @@ export class SelectionEventHandler {
   private selectionCanvasCtx: CanvasRenderingContext2D | null = null;
   private containerRef: HTMLDivElement | null = null;
   
+  
   // Event listeners cleanup
   private cleanup: (() => void)[] = [];
 
@@ -67,6 +68,7 @@ export class SelectionEventHandler {
   setContainerRef(containerRef: HTMLDivElement | null): void {
     this.containerRef = containerRef;
   }
+
 
   /**
    * MOUSE EVENT HANDLERS
@@ -169,26 +171,22 @@ export class SelectionEventHandler {
    * COORDINATE CONVERSION
    */
 
+
   private updateSelection(x: number, y: number): void {
     if (!this.selectionStart) return;
     
     // Convert viewport-relative coordinates to absolute document coordinates
     const scrollTop = this.containerRef?.scrollTop || 0;
-    const startAbsoluteY = this.selectionStart.y + scrollTop;
-    const endAbsoluteY = y + scrollTop;
+    const anchorY = this.selectionStart.y + scrollTop;
+    const focusY = y + scrollTop;
     
-    // Determine selection direction for better line-aware behavior
-    const isSelectingDown = endAbsoluteY > startAbsoluteY;
-    const isSelectingAcrossLines = Math.abs(endAbsoluteY - startAbsoluteY) > 10; // More than 10px vertical difference
+    // Native-like selection: simple anchor/focus model
+    // Anchor is where mouse was pressed, focus is where mouse is now
+    const anchorChar = this.fastSelection.coordsToChar(this.selectionStart.x, anchorY);
+    const focusChar = this.fastSelection.coordsToChar(x, focusY, this.selectionStart.x, anchorY);
     
-    // Use line-aware coordinate conversion for better multi-line selection
-    const startChar = this.fastSelection.coordsToCharLineAware(this.selectionStart.x, startAbsoluteY, false);
-    
-    // For multi-line selection, use more aggressive line-aware behavior
-    const endChar = this.fastSelection.coordsToCharLineAware(x, endAbsoluteY, isSelectingAcrossLines);
-    
-    // Set selection immediately for fast response
-    this.fastSelection.setSelection(startChar, endChar);
+    // Set selection with proper ordering (SelectionAPI handles min/max)
+    this.fastSelection.setSelection(anchorChar, focusChar);
   }
 
   /**

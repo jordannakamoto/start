@@ -188,7 +188,7 @@ export class TextModel {
   /**
    * Find closest item to coordinates using spatial grid
    */
-  findItemNear(x: number, y: number): TextItem | null {
+  findItemNear(x: number, y: number, anchorX?: number, anchorY?: number): TextItem | null {
     // Calculate grid cell for the given coordinates
     const gridX = Math.floor(x / this.GRID_SIZE);
     const gridY = Math.floor(y / this.GRID_SIZE);
@@ -201,144 +201,267 @@ export class TextModel {
     const itemsToCheck: TextItem[] = [];
     if (cellItems && cellItems.length > 0) {
       itemsToCheck.push(...cellItems);
-    } else {
-      // Check 3x3 grid around the target cell
-      for (let dx = -1; dx <= 1; dx++) {
-        for (let dy = -1; dy <= 1; dy++) {
-          const neighborKey = `${gridX + dx},${gridY + dy}`;
-          const neighborItems = this.grid.get(neighborKey);
-          if (neighborItems) {
-            itemsToCheck.push(...neighborItems);
-          }
+    }
+    
+    // Always check neighboring cells to catch edge cases
+    for (let dx = -1; dx <= 1; dx++) {
+      for (let dy = -1; dy <= 1; dy++) {
+        const neighborKey = `${gridX + dx},${gridY + dy}`;
+        const neighborItems = this.grid.get(neighborKey);
+        if (neighborItems) {
+          itemsToCheck.push(...neighborItems);
         }
       }
     }
     
-    // If still no items found, fall back to all items (shouldn't happen in practice)
-    if (itemsToCheck.length === 0) {
-      itemsToCheck.push(...this.items);
+    // Remove duplicates
+    const uniqueItems = [...new Set(itemsToCheck)];
+    
+    // If still no items found, use smart fallback for empty space selection
+    if (uniqueItems.length === 0) {
+      return this.findItemForEmptySpace(x, y, anchorX, anchorY);
     }
     
-    // Find closest item among the candidates
+    // Find closest item using improved algorithm
     let closestItem: TextItem | null = null;
     let minDist = Infinity;
     
-    for (const item of itemsToCheck) {
-      const centerX = item.x + item.width / 2;
-      const centerY = item.y;
-      const dist = Math.abs(x - centerX) + Math.abs(y - centerY) * 2;
+    // First, try to find items that the point is actually within
+    for (const item of uniqueItems) {
+      const itemTop = item.y - item.height;
+      const itemBottom = item.y;
+      const itemLeft = item.x;
+      const itemRight = item.x + item.width;
+      
+      // Check if the point is within this item's bounds
+      if (x >= itemLeft && x <= itemRight && y >= itemTop && y <= itemBottom) {
+        return item;
+      }
+    }
+    
+    // If no item contains the point, find the closest one
+    for (const item of uniqueItems) {
+      // Use a more accurate distance calculation
+      const itemCenterX = item.x + item.width / 2;
+      const itemCenterY = item.y - item.height / 2;
+      
+      // Calculate distance with Y-axis weighting to prefer items on the same line
+      const xDist = Math.abs(x - itemCenterX);
+      const yDist = Math.abs(y - itemCenterY);
+      const dist = xDist + yDist * 3; // Weight Y distance more heavily
       
       if (dist < minDist) {
         minDist = dist;
         closestItem = item;
       }
     }
-    
     return closestItem;
+  }
+
+  /**
+   * Find appropriate text item for empty space selection
+   * Used when clicking in margins, between lines, or other empty areas
+   */
+  private findItemForEmptySpace(x: number, y: number, anchorX?: number, anchorY?: number): TextItem | null {
+    if (this.items.length === 0) return null;
+    
+    // Different behavior based on whether we have an anchor (selection in progress)
+    const hasAnchor = anchorX !== undefined && anchorY !== undefined;
+    
+    // Strategy 1: Find items on the closest line vertically
+    const itemsByLine = this.groupItemsByLine();
+    let closestLine: TextItem[] | null = null;
+    let minYDistance = Infinity;
+    
+    // If we have an anchor, consider the anchor's line for better selection continuity
+    if (hasAnchor) {
+      // Find the line that contains the anchor
+      for (const lineItems of itemsByLine) {
+        const lineY = lineItems[0].y;
+        const lineTop = lineY - lineItems[0].height;
+        const lineBottom = lineY + lineItems[0].height * 0.3;
+        
+        // Check if anchor is in this line
+        if (anchorY! >= lineTop && anchorY! <= lineBottom) {
+          // If focus is close to anchor's line, prefer anchor's line for continuity
+          const focusToAnchorLineDist = Math.abs(y - lineY);
+          if (focusToAnchorLineDist < lineItems[0].height * 2) {
+            closestLine = lineItems;
+            break;
+          }
+        }
+      }
+    }
+    
+    // If no anchor-based line found, find closest line normally
+    if (!closestLine) {
+      for (const lineItems of itemsByLine) {
+        const lineY = lineItems[0].y;
+        const lineTop = lineY - lineItems[0].height;
+        const lineBottom = lineY + lineItems[0].height * 0.3; // Slightly larger margin
+        
+        let yDistance: number;
+        if (y >= lineTop && y <= lineBottom) {
+          // Click is within the line's vertical bounds
+          yDistance = 0;
+        } else {
+          // Click is outside the line - calculate distance to closest edge
+          yDistance = Math.min(Math.abs(y - lineTop), Math.abs(y - lineBottom));
+        }
+        
+        if (yDistance < minYDistance) {
+          minYDistance = yDistance;
+          closestLine = lineItems;
+        }
+      }
+    }
+    
+    if (!closestLine) return null;
+    
+    // Strategy 2: Within the closest line, find the most appropriate item
+    // Behavior depends on whether we have an anchor or not
+    
+    const lineStart = Math.min(...closestLine.map(item => item.x));
+    const lineEnd = Math.max(...closestLine.map(item => item.x + item.width));
+    
+    if (x < lineStart) {
+      // Clicking to the left of the line - use first item (start of line)
+      return closestLine.reduce((first, item) => item.x < first.x ? item : first);
+    } else if (x > lineEnd) {
+      // Clicking to the right of the line - use last item (end of line)
+      return closestLine.reduce((last, item) => item.x + item.width > last.x + last.width ? item : last);
+    } else {
+      // Clicking within the line - behavior depends on anchor context
+      let closestItem = closestLine[0];
+      let minDistance = Infinity;
+      
+      // If we have an anchor, consider anchor-relative positioning
+      if (hasAnchor) {
+        // Find which item contains or is closest to the anchor
+        let anchorItem: TextItem | null = null;
+        for (const item of closestLine) {
+          if (anchorX! >= item.x && anchorX! <= item.x + item.width) {
+            anchorItem = item;
+            break;
+          }
+        }
+        
+        // If anchor is in this line, use that context for better selection
+        if (anchorItem) {
+          // If focus is close to anchor, prefer items in the selection direction
+          const isSelectingForward = x > anchorX!;
+          const anchorToFocusDist = Math.abs(x - anchorX!);
+          
+          // If we're selecting in a clear direction and not too far, be more directional
+          if (anchorToFocusDist > 50) { // Threshold for directional selection
+            const candidates = isSelectingForward 
+              ? closestLine.filter(item => item.x >= anchorItem!.x)
+              : closestLine.filter(item => item.x <= anchorItem!.x);
+            
+            if (candidates.length > 0) {
+              closestLine = candidates;
+            }
+          }
+        }
+      }
+      
+      // Find closest item with gap detection
+      for (const item of closestLine) {
+        // Check if clicking in a gap between this item and the next
+        const itemEnd = item.x + item.width;
+        const nextItem = closestLine.find(next => next.x > item.x && next.x === Math.min(...closestLine.filter(i => i.x > item.x).map(i => i.x)));
+        
+        if (nextItem) {
+          const gapStart = itemEnd;
+          const gapEnd = nextItem.x;
+          
+          // If clicking in the gap, choose the item based on which side of the gap center
+          if (x >= gapStart && x <= gapEnd) {
+            const gapCenter = (gapStart + gapEnd) / 2;
+            return x < gapCenter ? item : nextItem;
+          }
+        }
+        
+        // Otherwise, use distance to item center
+        const itemCenter = item.x + item.width / 2;
+        const distance = Math.abs(x - itemCenter);
+        if (distance < minDistance) {
+          minDistance = distance;
+          closestItem = item;
+        }
+      }
+      
+      return closestItem;
+    }
+  }
+
+  /**
+   * Group text items by line for empty space selection
+   */
+  private groupItemsByLine(): TextItem[][] {
+    const lines: TextItem[][] = [];
+    const tolerance = 5; // Y tolerance for same line
+    
+    for (const item of this.items) {
+      let addedToLine = false;
+      
+      for (const line of lines) {
+        if (Math.abs(item.y - line[0].y) <= tolerance) {
+          line.push(item);
+          addedToLine = true;
+          break;
+        }
+      }
+      
+      if (!addedToLine) {
+        lines.push([item]);
+      }
+    }
+    
+    // Sort items within each line by x position
+    lines.forEach(line => line.sort((a, b) => a.x - b.x));
+    
+    return lines;
   }
 
   /**
    * Convert coordinates to character index
    */
-  coordinatesToOffset(x: number, y: number): number | null {
-    const item = this.findItemNear(x, y);
+  coordinatesToOffset(x: number, y: number, anchorX?: number, anchorY?: number): number | null {
+    const item = this.findItemNear(x, y, anchorX, anchorY);
     if (!item) return null;
 
     const relativeX = x - item.x;
-    const charWidth = item.width / item.str.length;
-    const charOffset = Math.max(0, Math.min(
-      Math.round(relativeX / charWidth),
-      item.str.length
-    ));
-
+    
+    // Handle special cases for margin and space clicks
+    const charOffset = this.findCharacterOffset(item, relativeX, x, y);
     return item.charStart + charOffset;
   }
 
   /**
-   * Convert coordinates to character index with line-aware behavior
-   * for better multi-line selection
+   * Find character offset within a text item using proportional positioning
+   * This ensures consistency with the pre-calculated text width
    */
-  coordinatesToOffsetLineAware(x: number, y: number, isEndOfSelection: boolean = false): number | null {
-    const item = this.findItemNear(x, y);
-    if (!item) return null;
-
-    const relativeX = x - item.x;
-    const charWidth = item.width / item.str.length;
-    
-    // For end-of-selection behavior, be more aggressive about line selection
-    if (isEndOfSelection) {
-      const itemEndX = item.x + item.width;
-      const itemStartX = item.x;
-      
-      // If selecting significantly past the end of the text item, extend to line end
-      if (x > itemEndX + charWidth) {
-        const lineEndOffset = this.findLineEnd(item);
-        return lineEndOffset;
-      }
-      
-      // If selecting significantly before the start of the text item, extend to line start
-      if (x < itemStartX - charWidth) {
-        const lineStartOffset = this.findLineStart(item);
-        return lineStartOffset;
-      }
-      
-      // If selecting past the 3/4 point of the line, extend to line end
-      const lineThreeQuarters = itemStartX + (item.width * 0.75);
-      if (x > lineThreeQuarters) {
-        const lineEndOffset = this.findLineEnd(item);
-        return lineEndOffset;
-      }
-      
-      // If selecting before the 1/4 point of the line, extend to line start
-      const lineOneQuarter = itemStartX + (item.width * 0.25);
-      if (x < lineOneQuarter) {
-        const lineStartOffset = this.findLineStart(item);
-        return lineStartOffset;
-      }
+  private findCharacterOffset(item: TextItem, relativeX: number, absoluteX?: number, absoluteY?: number): number {
+    // If clicking before the start of the text item (left margin)
+    if (relativeX <= 0) {
+      return 0;
     }
 
-    // Normal character-precise selection
-    const charOffset = Math.max(0, Math.min(
-      Math.round(relativeX / charWidth),
-      item.str.length
-    ));
+    // If clicking after the end of the text item (right margin or end of line)
+    if (relativeX >= item.width) {
+      return item.str.length;
+    }
 
-    return item.charStart + charOffset;
+    // For clicks within the text item, use proportional positioning
+    // This matches how the text is actually rendered
+    const proportion = relativeX / item.width;
+    const charPosition = Math.round(proportion * item.str.length);
+    
+    return Math.max(0, Math.min(charPosition, item.str.length));
   }
 
-  /**
-   * Find the end of the line containing the given item
-   */
-  private findLineEnd(item: TextItem): number {
-    // Find all items on the same line
-    const sameLineItems = this.items.filter(otherItem => 
-      otherItem.pageIndex === item.pageIndex && 
-      Math.abs(otherItem.y - item.y) <= 5 // Same line tolerance
-    );
-    
-    // Sort by x position and get the last item
-    sameLineItems.sort((a, b) => a.x - b.x);
-    const lastItem = sameLineItems[sameLineItems.length - 1];
-    
-    return lastItem ? lastItem.charEnd : item.charEnd;
-  }
 
-  /**
-   * Find the start of the line containing the given item
-   */
-  private findLineStart(item: TextItem): number {
-    // Find all items on the same line
-    const sameLineItems = this.items.filter(otherItem => 
-      otherItem.pageIndex === item.pageIndex && 
-      Math.abs(otherItem.y - item.y) <= 5 // Same line tolerance
-    );
-    
-    // Sort by x position and get the first item
-    sameLineItems.sort((a, b) => a.x - b.x);
-    const firstItem = sameLineItems[0];
-    
-    return firstItem ? firstItem.charStart : item.charStart;
-  }
 
   /**
    * Get items in coordinate range using spatial grid

@@ -52,18 +52,11 @@ export class FastSelection {
   /**
    * Convert screen coordinates to character index - delegates to TextModel
    */
-  coordsToChar(x: number, y: number): number {
-    const offset = this.textModel.coordinatesToOffset(x, y);
+  coordsToChar(x: number, y: number, anchorX?: number, anchorY?: number): number {
+    const offset = this.textModel.coordinatesToOffset(x, y, anchorX, anchorY);
     return offset || 0;
   }
 
-  /**
-   * Convert screen coordinates to character index with line-aware behavior
-   */
-  coordsToCharLineAware(x: number, y: number, isEndOfSelection: boolean = false): number {
-    const offset = this.textModel.coordinatesToOffsetLineAware(x, y, isEndOfSelection);
-    return offset || 0;
-  }
 
   /**
    * Set selection by character range - delegates to SelectionAPI

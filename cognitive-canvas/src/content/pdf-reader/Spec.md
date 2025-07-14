@@ -6,4 +6,4 @@
 
 4. SelectionEventHandler handles clicks and other canvas input events.
    
-5. PDF ReaderContentType is our final frontend component for our overall system.
+5. PDF ReaderContentType is our final frontend component for our overall syustem.
