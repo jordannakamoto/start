@@ -716,13 +716,6 @@ const PDFReaderEditor = memo<ContentEditorProps>(({ content, onContentChange, on
                   +
                 </button>
               </div>
-              
-              {/* Selection help */}
-              <div className="bg-blue-50/90 backdrop-blur rounded-lg shadow-sm border border-blue-200 p-2 text-xs text-blue-800 max-w-56">
-                <div className="font-medium mb-1">Fast Selection:</div>
-                <div>Click and drag to select text</div>
-                <div>Ctrl/Cmd+C to copy</div>
-              </div>
             </div>
             
             {/* Continuous PDF document */}
