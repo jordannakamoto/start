@@ -7,6 +7,7 @@ import { Selection } from './SelectionAPI';
 
 export interface SelectionEventHandlerOptions {
   onSelectionChange?: (selection: Selection | null) => void;
+  onSelectionEnd?: (selection: Selection | null) => void;
   onTextCopy?: (text: string) => void;
 }
 
@@ -26,13 +27,19 @@ export class SelectionEventHandler {
   // Canvas references
   private textCanvas: HTMLCanvasElement | null = null;
   private selectionCanvas: HTMLCanvasElement | null = null;
+  private selectionCanvasCtx: CanvasRenderingContext2D | null = null;
   
   // Event listeners cleanup
   private cleanup: (() => void)[] = [];
 
-  constructor(fastSelection: FastSelection, options: SelectionEventHandlerOptions = {}) {
+  constructor(
+    fastSelection: FastSelection, 
+    selectionCanvasCtx: CanvasRenderingContext2D | null = null,
+    options: SelectionEventHandlerOptions = {}
+  ) {
     this.fastSelection = fastSelection;
     this.options = options;
+    this.selectionCanvasCtx = selectionCanvasCtx;
     
     // Listen to selection changes from FastSelection
     const unsubscribe = this.fastSelection.onChange((selection) => {
@@ -47,6 +54,10 @@ export class SelectionEventHandler {
   setCanvasElements(textCanvas: HTMLCanvasElement, selectionCanvas: HTMLCanvasElement): void {
     this.textCanvas = textCanvas;
     this.selectionCanvas = selectionCanvas;
+    // Update context if not provided in constructor
+    if (!this.selectionCanvasCtx && selectionCanvas) {
+      this.selectionCanvasCtx = selectionCanvas.getContext('2d');
+    }
   }
 
   /**
@@ -73,6 +84,12 @@ export class SelectionEventHandler {
     this.isSelecting = true;
     this.selectionStart = { x, y };
     this.fastSelection.clearSelection();
+    
+    // Draw initial selection point immediately
+    this.drawCurrentSelection();
+    
+    // Notify React state
+    this.options.onSelectionChange?.(null);
   };
 
   handleMouseMove = (e: React.MouseEvent): void => {
@@ -80,19 +97,24 @@ export class SelectionEventHandler {
     
     e.preventDefault();
     
-    // Throttle with requestAnimationFrame for performance
+    const rect = this.textCanvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    
+    // Update selection model immediately
+    this.updateSelection(x, y);
+    
+    // Draw selection immediately for zero-latency feedback
+    this.drawCurrentSelection();
+    
+    // Throttle React state updates
     if (this.animationFrame) {
       cancelAnimationFrame(this.animationFrame);
     }
     
     this.animationFrame = requestAnimationFrame(() => {
-      if (!this.textCanvas || !this.selectionStart) return;
-      
-      const rect = this.textCanvas.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
-      
-      this.updateSelection(x, y);
+      const selection = this.fastSelection.getSelection();
+      this.options.onSelectionChange?.(selection);
     });
   };
 
@@ -104,6 +126,10 @@ export class SelectionEventHandler {
       cancelAnimationFrame(this.animationFrame);
       this.animationFrame = null;
     }
+    
+    // Final selection update
+    const finalSelection = this.fastSelection.getSelection();
+    this.options.onSelectionEnd?.(finalSelection);
   };
 
   handleMouseLeave = (): void => {
@@ -141,6 +167,28 @@ export class SelectionEventHandler {
     
     // Set selection immediately for fast response
     this.fastSelection.setSelection(startChar, endChar);
+  }
+
+  /**
+   * Draw current selection directly to canvas for zero-latency feedback
+   */
+  private drawCurrentSelection(): void {
+    if (!this.selectionCanvasCtx || !this.selectionCanvas) return;
+    
+    const ctx = this.selectionCanvasCtx;
+    
+    // Clear the entire selection canvas
+    ctx.clearRect(0, 0, this.selectionCanvas.width, this.selectionCanvas.height);
+    
+    // Get selection rectangles
+    const rects = this.fastSelection.getSelectionRects();
+    if (rects.length === 0) return;
+    
+    // Draw selection rectangles
+    ctx.fillStyle = 'rgba(0, 123, 255, 0.3)';
+    for (const rect of rects) {
+      ctx.fillRect(rect.x, rect.y, rect.width, rect.height);
+    }
   }
 
   /**

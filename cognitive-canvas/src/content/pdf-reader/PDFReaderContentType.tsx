@@ -49,6 +49,7 @@ const PDFDocumentViewer = memo(({ pages, scale }: { pages: pdfjsLib.PDFPageProxy
   const visiblePagesRef = useRef<VisiblePage[]>([]);
   const prerenderedTextRef = useRef<Map<number, any[]>>(new Map());
   const scrollUpdateRef = useRef<number | null>(null);
+  const selectionUpdateRef = useRef<number | null>(null);
   const [selection, setSelection] = useState<Selection | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [visiblePages, setVisiblePages] = useState<VisiblePage[]>([]);
@@ -101,30 +102,6 @@ const PDFDocumentViewer = memo(({ pages, scale }: { pages: pdfjsLib.PDFPageProxy
     return pagesInfoRef.current.length;
   }, []);
 
-  // Initialize event handler
-  useEffect(() => {
-    if (!eventHandlerRef.current) {
-      eventHandlerRef.current = new SelectionEventHandler(fastSelectionRef.current, {
-        onSelectionChange: (newSelection) => {
-          setSelection(newSelection);
-        }
-      });
-      eventHandlerRef.current.setupGlobalListeners();
-    }
-    
-    // Set canvas elements when available
-    if (textCanvasRef.current && selectionCanvasRef.current) {
-      eventHandlerRef.current.setCanvasElements(textCanvasRef.current, selectionCanvasRef.current);
-    }
-    
-    return () => {
-      if (eventHandlerRef.current) {
-        eventHandlerRef.current.destroy();
-        eventHandlerRef.current = null;
-      }
-    };
-  }, []);
-
   const drawSelection = useCallback((ctx: CanvasRenderingContext2D) => {
     const rects = fastSelectionRef.current.getSelectionRects();
     if (rects.length === 0) return;
@@ -140,6 +117,67 @@ const PDFDocumentViewer = memo(({ pages, scale }: { pages: pdfjsLib.PDFPageProxy
   const getSelectedText = useCallback((): string => {
     return fastSelectionRef.current.getSelectedText();
   }, []);
+
+  // Throttled selection state update for React
+  const handleSelectionChange = useCallback((newSelection: Selection | null) => {
+    // Cancel any pending update
+    if (selectionUpdateRef.current) {
+      cancelAnimationFrame(selectionUpdateRef.current);
+    }
+    
+    // Schedule new update
+    selectionUpdateRef.current = requestAnimationFrame(() => {
+      setSelection(newSelection);
+      selectionUpdateRef.current = null;
+    });
+  }, []);
+
+  // Immediate selection state update for final selection
+  const handleSelectionEnd = useCallback((finalSelection: Selection | null) => {
+    // Cancel any pending throttled update
+    if (selectionUpdateRef.current) {
+      cancelAnimationFrame(selectionUpdateRef.current);
+      selectionUpdateRef.current = null;
+    }
+    
+    // Set final selection immediately
+    setSelection(finalSelection);
+  }, []);
+
+  // Initialize event handler
+  useEffect(() => {
+    if (!eventHandlerRef.current && selectionCanvasRef.current) {
+      const selectionCtx = selectionCanvasRef.current.getContext('2d');
+      if (selectionCtx) {
+        eventHandlerRef.current = new SelectionEventHandler(
+          fastSelectionRef.current,
+          selectionCtx,
+          {
+            onSelectionChange: handleSelectionChange,
+            onSelectionEnd: handleSelectionEnd
+          }
+        );
+        eventHandlerRef.current.setupGlobalListeners();
+      }
+    }
+    
+    // Set canvas elements when available
+    if (textCanvasRef.current && selectionCanvasRef.current && eventHandlerRef.current) {
+      eventHandlerRef.current.setCanvasElements(textCanvasRef.current, selectionCanvasRef.current);
+    }
+    
+    return () => {
+      if (eventHandlerRef.current) {
+        eventHandlerRef.current.destroy();
+        eventHandlerRef.current = null;
+      }
+      // Clean up any pending selection updates
+      if (selectionUpdateRef.current) {
+        cancelAnimationFrame(selectionUpdateRef.current);
+        selectionUpdateRef.current = null;
+      }
+    };
+  }, [handleSelectionChange, handleSelectionEnd]);
 
   // Pre-render all text content to avoid async operations during scroll
   useEffect(() => {
