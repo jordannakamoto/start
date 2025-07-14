@@ -47,12 +47,14 @@ const PDFDocumentViewer = memo(({ pages, scale }: { pages: pdfjsLib.PDFPageProxy
   const eventHandlerRef = useRef<SelectionEventHandler | null>(null);
   const pagesInfoRef = useRef<PageInfo[]>([]);
   const visiblePagesRef = useRef<VisiblePage[]>([]);
+  const selectionPagesRef = useRef<VisiblePage[]>([]);
   const prerenderedTextRef = useRef<Map<number, any[]>>(new Map());
   const scrollUpdateRef = useRef<number | null>(null);
   const selectionUpdateRef = useRef<number | null>(null);
   const [selection, setSelection] = useState<Selection | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [visiblePages, setVisiblePages] = useState<VisiblePage[]>([]);
+  const [selectionPages, setSelectionPages] = useState<VisiblePage[]>([]);
   const [scrollPosition, setScrollPosition] = useState(0);
   const [totalHeight, setTotalHeight] = useState(0);
   const [maxWidth, setMaxWidth] = useState(0);
@@ -86,6 +88,38 @@ const PDFDocumentViewer = memo(({ pages, scale }: { pages: pdfjsLib.PDFPageProxy
     }
     
     return visible;
+  }, [pages, scale]);
+
+  // Calculate pages for selection model (larger buffer for continuity)
+  const calculateSelectionPages = useCallback((scrollTop: number, containerHeight: number): VisiblePage[] => {
+    if (pagesInfoRef.current.length === 0) return [];
+    
+    // Use a much larger buffer for selection model to ensure continuity
+    const selectionBuffer = containerHeight * 3; // 3 screen heights before/after
+    const selectionTop = scrollTop - selectionBuffer;
+    const selectionBottom = scrollTop + containerHeight + selectionBuffer;
+    
+    const selectionPages: VisiblePage[] = [];
+    
+    for (const pageInfo of pagesInfoRef.current) {
+      const pageTop = pageInfo.offsetY;
+      const pageBottom = pageInfo.offsetY + pageInfo.height;
+      
+      // Check if page is in selection buffer
+      if (pageBottom >= selectionTop && pageTop <= selectionBottom) {
+        const page = pages[pageInfo.index];
+        const viewport = page.getViewport({ scale });
+        
+        selectionPages.push({
+          pageIndex: pageInfo.index,
+          page,
+          offsetY: pageInfo.offsetY,
+          viewport
+        });
+      }
+    }
+    
+    return selectionPages;
   }, [pages, scale]);
 
   // Calculate current page based on scroll position
@@ -261,8 +295,11 @@ const PDFDocumentViewer = memo(({ pages, scale }: { pages: pdfjsLib.PDFPageProxy
       if (containerRef.current) {
         const containerHeight = containerRef.current.clientHeight;
         const initialVisible = calculateVisiblePages(0, containerHeight);
+        const initialSelection = calculateSelectionPages(0, containerHeight);
         setVisiblePages(initialVisible);
+        setSelectionPages(initialSelection);
         visiblePagesRef.current = initialVisible;
+        selectionPagesRef.current = initialSelection;
       }
       
       console.log('Text pre-rendering complete for', pages.length, 'pages');
@@ -307,17 +344,45 @@ const PDFDocumentViewer = memo(({ pages, scale }: { pages: pdfjsLib.PDFPageProxy
       const pageHorizontalOffset = (containerWidth - maxWidth) / 2;
       const scrollTop = containerRef.current?.scrollTop || 0;
 
-      // Render visible pages using pre-rendered text
-      const allVisibleTextItems: any[] = [];
+      // Build selection model from larger buffer zone
+      const allSelectionTextItems: any[] = [];
+      // Build rendering items from visible pages only
       const textItemsForRendering: any[] = [];
 
+      // Process selection pages for FastSelection model
+      for (const selectionPage of selectionPages) {
+        const { pageIndex, viewport, offsetY } = selectionPage;
+        const pageTextItems = prerenderedTextRef.current.get(pageIndex);
+        
+        if (!pageTextItems) continue;
+
+        for (const textItem of pageTextItems) {
+          const absoluteY = textItem.y + offsetY;
+          const centeredX = textItem.x + (maxWidth - viewport.width) / 2 + pageHorizontalOffset;
+          
+          // Add all items in selection buffer to FastSelection model
+          allSelectionTextItems.push({
+            str: textItem.str,
+            x: centeredX,
+            y: absoluteY,
+            width: textItem.width,
+            height: textItem.fontSize,
+            fontSize: textItem.fontSize,
+            fontFamily: textItem.fontFamily,
+            pageIndex: textItem.pageIndex,
+            globalCharIndex: 0
+          });
+        }
+      }
+
+      // Process visible pages for rendering
       for (const visiblePage of visiblePages) {
         const { pageIndex, viewport, offsetY } = visiblePage;
         const pageTextItems = prerenderedTextRef.current.get(pageIndex);
         
         if (!pageTextItems) continue;
 
-        // Transform pre-rendered text to viewport coordinates
+        // Transform pre-rendered text to viewport coordinates for rendering
         for (const textItem of pageTextItems) {
           // Calculate absolute position in document
           const absoluteY = textItem.y + offsetY;
@@ -329,21 +394,6 @@ const PDFDocumentViewer = memo(({ pages, scale }: { pages: pdfjsLib.PDFPageProxy
           if (relativeY > -textItem.fontSize && relativeY < containerHeight + textItem.fontSize) {
             // Calculate centered X position
             const centeredX = textItem.x + (maxWidth - viewport.width) / 2 + pageHorizontalOffset;
-            
-            // For FastSelection: store absolute coordinates
-            // This ensures the selection model has a consistent coordinate system
-            // Mouse coordinates will be transformed to absolute in SelectionEventHandler
-            allVisibleTextItems.push({
-              str: textItem.str,
-              x: centeredX,
-              y: absoluteY, // Use absolute Y coordinate
-              width: textItem.width,
-              height: textItem.fontSize,
-              fontSize: textItem.fontSize,
-              fontFamily: textItem.fontFamily,
-              pageIndex: textItem.pageIndex,
-              globalCharIndex: 0 // Will be set during SelectionAPI initialization
-            });
             
             // For text rendering: store viewport-relative coordinates
             textItemsForRendering.push({
@@ -370,12 +420,12 @@ const PDFDocumentViewer = memo(({ pages, scale }: { pages: pdfjsLib.PDFPageProxy
         }
       }
 
-      // Only rebuild FastSelectionAPI if visible pages changed (performance optimization)
-      const currentVisiblePagesKey = visiblePages.map(p => p.pageIndex).sort().join(',');
-      if (currentVisiblePagesKey !== lastVisiblePagesRef.current) {
-        // Initialize fast selection with simple text items
-        fastSelectionRef.current.init(allVisibleTextItems);
-        lastVisiblePagesRef.current = currentVisiblePagesKey;
+      // Only rebuild FastSelectionAPI if selection pages changed (performance optimization)
+      const currentSelectionPagesKey = selectionPages.map(p => p.pageIndex).sort().join(',');
+      if (currentSelectionPagesKey !== lastVisiblePagesRef.current) {
+        // Initialize fast selection with text items from larger buffer
+        fastSelectionRef.current.init(allSelectionTextItems);
+        lastVisiblePagesRef.current = currentSelectionPagesKey;
       }
 
       // Render all text directly to text canvas
@@ -387,7 +437,7 @@ const PDFDocumentViewer = memo(({ pages, scale }: { pages: pdfjsLib.PDFPageProxy
     };
 
     renderTextLayer();
-  }, [visiblePages, scale, maxWidth, scrollPosition]);
+  }, [visiblePages, selectionPages, scale, maxWidth, scrollPosition]);
 
   // Separate effect for selection rendering (performance optimized)
   useEffect(() => {
@@ -464,6 +514,16 @@ const PDFDocumentViewer = memo(({ pages, scale }: { pages: pdfjsLib.PDFPageProxy
           setVisiblePages(newVisiblePages);
           visiblePagesRef.current = newVisiblePages;
         }
+        
+        // Update selection pages only if they actually changed
+        const newSelectionPages = calculateSelectionPages(scrollTop, containerHeight);
+        const selectionPageIndices = newSelectionPages.map(p => p.pageIndex).sort();
+        const currentSelectionIndices = selectionPagesRef.current.map(p => p.pageIndex).sort();
+        
+        if (JSON.stringify(selectionPageIndices) !== JSON.stringify(currentSelectionIndices)) {
+          setSelectionPages(newSelectionPages);
+          selectionPagesRef.current = newSelectionPages;
+        }
       });
       
       // Mark scrolling as finished after 150ms of no scroll events
@@ -482,7 +542,7 @@ const PDFDocumentViewer = memo(({ pages, scale }: { pages: pdfjsLib.PDFPageProxy
         }
       };
     }
-  }, [calculateCurrentPage, calculateVisiblePages, currentPage]);
+  }, [calculateCurrentPage, calculateVisiblePages, calculateSelectionPages, currentPage]);
 
 
   return (
