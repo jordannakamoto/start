@@ -1,0 +1,65 @@
+{
+  "test_consolidated_123": {
+    "pdf_id": "test_consolidated_123",
+    "status": "ingested",
+    "document_type": null,
+    "created_at": "2025-07-15T00:44:05.020001",
+    "updated_at": "2025-07-15T00:44:05.020001",
+    "total_pages": 2,
+    "file_path": "datastore/documents/test_consolidated_123.json"
+  },
+  "pdf_16770d71baefe46f": {
+    "pdf_id": "pdf_16770d71baefe46f",
+    "status": "classified",
+    "document_type": "contract",
+    "created_at": "2025-07-15T01:08:08.162117",
+    "updated_at": "2025-07-15T01:18:03.682057",
+    "total_pages": 2,
+    "file_path": "datastore/documents/pdf_16770d71baefe46f.json"
+  },
+  "pdf_46b49333dfb173f6": {
+    "pdf_id": "pdf_46b49333dfb173f6",
+    "status": "ingested",
+    "document_type": null,
+    "created_at": "2025-07-15T00:51:00.027241",
+    "updated_at": "2025-07-15T00:51:29.113349",
+    "total_pages": 1,
+    "file_path": "datastore/documents/pdf_46b49333dfb173f6.json"
+  },
+  "pdf_d2e2356e9be2e15d": {
+    "pdf_id": "pdf_d2e2356e9be2e15d",
+    "status": "classified",
+    "document_type": "technical_manual",
+    "created_at": "2025-07-15T00:53:22.994926",
+    "updated_at": "2025-07-15T01:07:21.639150",
+    "total_pages": 2,
+    "file_path": "datastore/documents/pdf_d2e2356e9be2e15d.json"
+  },
+  "pdf_0a4e65a8ef5c879b": {
+    "pdf_id": "pdf_0a4e65a8ef5c879b",
+    "status": "ingested",
+    "document_type": null,
+    "created_at": "2025-07-15T00:55:08.167756",
+    "updated_at": "2025-07-15T01:09:53.211132",
+    "total_pages": 1,
+    "file_path": "datastore/documents/pdf_0a4e65a8ef5c879b.json"
+  },
+  "pdf_f2d76405b1f85560": {
+    "pdf_id": "pdf_f2d76405b1f85560",
+    "status": "ingested",
+    "document_type": null,
+    "created_at": "2025-07-15T01:10:28.051748",
+    "updated_at": "2025-07-15T01:10:28.051748",
+    "total_pages": 2,
+    "file_path": "datastore/documents/pdf_f2d76405b1f85560.json"
+  },
+  "pdf_b0e5160eb5811a0e": {
+    "pdf_id": "pdf_b0e5160eb5811a0e",
+    "status": "classified",
+    "document_type": "contract",
+    "created_at": "2025-07-15T01:18:09.407001",
+    "updated_at": "2025-07-15T01:18:09.407640",
+    "total_pages": 2,
+    "file_path": "datastore/documents/pdf_b0e5160eb5811a0e.json"
+  }
+}

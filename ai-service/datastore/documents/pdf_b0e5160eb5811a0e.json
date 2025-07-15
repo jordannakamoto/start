@@ -1,0 +1,58 @@
+{
+  "pdf_id": "pdf_b0e5160eb5811a0e",
+  "status": "classified",
+  "created_at": "2025-07-15T01:18:09.407001",
+  "updated_at": "2025-07-15T01:18:09.407640",
+  "pages": {
+    "1": "This is a test contract. Party A must provide services. Party B shall pay within 30 days.",
+    "2": "Additional contract terms and conditions apply."
+  },
+  "total_pages": 2,
+  "document_type": "contract",
+  "classification_confidence": 0.5,
+  "classification_metadata": {
+    "sample_content": "This is a test contract. Party A must provide services. Party B shall pay within 30 days. Additional contract terms and conditions apply.",
+    "pipeline_config": {
+      "document_type": "contract",
+      "pipeline_steps": [
+        "analysis",
+        "map",
+        "interpret",
+        "publish"
+      ],
+      "focus_areas": [
+        "obligations",
+        "terms",
+        "parties",
+        "financial_arrangements",
+        "compliance"
+      ],
+      "description": "Legal contracts, service agreements, employment contracts"
+    },
+    "supported_types": [
+      "contract",
+      "research_paper",
+      "legal_document",
+      "technical_manual",
+      "business_report",
+      "policy_document"
+    ]
+  },
+  "processing_results": null,
+  "workflow_history": [
+    {
+      "timestamp": "2025-07-15T01:18:09.407001",
+      "status": "ingested",
+      "action": "created",
+      "document_type": null,
+      "confidence": null
+    },
+    {
+      "timestamp": "2025-07-15T01:18:09.407640",
+      "status": "classified",
+      "action": "updated",
+      "document_type": "contract",
+      "confidence": 0.5
+    }
+  ]
+}

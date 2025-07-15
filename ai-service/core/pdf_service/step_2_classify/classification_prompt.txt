@@ -1,0 +1,24 @@
+Analyze the following document content and classify it into one of the supported document types.
+
+DOCUMENT CONTENT:
+{sample_content}
+
+SUPPORTED DOCUMENT TYPES:
+{document_types}
+
+CLASSIFICATION INSTRUCTIONS:
+1. Read the document content carefully
+2. Identify key characteristics, language patterns, and structural elements
+3. Match these characteristics to the most appropriate document type
+4. Respond with ONLY the document type name (e.g., "contract", "research_paper", etc.)
+5. Do not include explanations or additional text
+
+EXAMPLES:
+- Documents with terms like "obligations", "parties", "agreement", "shall", "terms and conditions" → contract
+- Documents with "methodology", "results", "conclusion", "abstract", "references" → research_paper
+- Documents with "plaintiff", "defendant", "court", "ruling", "precedent" → legal_document
+- Documents with "procedures", "specifications", "requirements", "instructions" → technical_manual
+- Documents with "revenue", "profit", "analysis", "performance", "metrics" → business_report
+- Documents with "policy", "compliance", "rules", "regulations", "requirements" → policy_document
+
+Classify the document type:

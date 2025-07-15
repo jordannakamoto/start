@@ -1,0 +1,24 @@
+{
+  "pdf_id": "test_consolidated_123",
+  "status": "ingested",
+  "created_at": "2025-07-15T00:44:05.020001",
+  "updated_at": "2025-07-15T00:44:05.020001",
+  "pages": {
+    "1": "Test content page 1",
+    "2": "Test content page 2"
+  },
+  "total_pages": 2,
+  "document_type": null,
+  "classification_confidence": null,
+  "classification_metadata": null,
+  "processing_results": null,
+  "workflow_history": [
+    {
+      "timestamp": "2025-07-15T00:44:05.020001",
+      "status": "ingested",
+      "action": "created",
+      "document_type": null,
+      "confidence": null
+    }
+  ]
+}

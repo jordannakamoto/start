@@ -1,0 +1,86 @@
+{
+  "pdf_id": "pdf_16770d71baefe46f",
+  "status": "classified",
+  "created_at": "2025-07-15T01:08:08.162117",
+  "updated_at": "2025-07-15T01:18:03.682057",
+  "pages": {
+    "1": "\n        SERVICE AGREEMENT\n        \n        This Service Agreement (\"Agreement\") is entered into between Company A (\"Provider\") and Company B (\"Client\").\n        \n        1. SERVICES\n        The Provider shall provide consulting services as described in Exhibit A.\n        The Provider must deliver all services within 30 days of the effective date.\n        \n        2. PAYMENT TERMS\n        Client shall pay Provider $10,000 within 15 days of invoice receipt.\n        Late payments may incur a 1.5% monthly fee.\n        ",
+    "2": "\n        3. OBLIGATIONS\n        Provider obligations:\n        - Must maintain confidentiality of all client information\n        - Shall not disclose proprietary information to third parties\n        - Must provide monthly progress reports\n        \n        Client obligations:\n        - Shall provide necessary access to systems and personnel\n        - Must approve deliverables within 5 business days\n        - May not unreasonably withhold approval\n        \n        4. TERMINATION\n        Either party may terminate this agreement with 30 days written notice.\n        Upon termination, all confidential information must be returned.\n        "
+  },
+  "total_pages": 2,
+  "document_type": "contract",
+  "classification_confidence": 0.5,
+  "classification_metadata": {
+    "sample_content": "SERVICE AGREEMENT\n        \n        This Service Agreement (\"Agreement\") is entered into between Company A (\"Provider\") and Company B (\"Client\").\n        \n        1. SERVICES\n        The Provider shall provide consulting services as described in Exhibit A.\n        The Provider must deliver all services within 30 days of the effective date.\n        \n        2. PAYMENT TERMS\n        Client shall pay Provider $10,000 within 15 days of invoice receipt.\n        Late payments may incur a 1.5% monthly fee.. 3. OBLIGATIONS\n        Provider obligations:\n        - Must maintain confidentiality of all client information\n        - Shall not disclose proprietary information to third parties\n        - Must provide monthly progress reports\n        \n        Client obligations:\n        - Shall provide necessary access to systems and personnel\n        - Must approve deliverables within 5 business days\n        - May not unreasonably withhold approval\n        \n        4. TERMINATION\n        Either party may terminate this agreement with 30 days written notice.\n        Upon termination, all confidential information must be returned..",
+    "pipeline_config": {
+      "document_type": "contract",
+      "pipeline_steps": [
+        "analysis",
+        "map",
+        "interpret",
+        "publish"
+      ],
+      "focus_areas": [
+        "obligations",
+        "terms",
+        "parties",
+        "financial_arrangements",
+        "compliance"
+      ],
+      "description": "Legal contracts, service agreements, employment contracts"
+    },
+    "supported_types": [
+      "contract",
+      "research_paper",
+      "legal_document",
+      "technical_manual",
+      "business_report",
+      "policy_document"
+    ]
+  },
+  "processing_results": null,
+  "workflow_history": [
+    {
+      "timestamp": "2025-07-15T01:08:08.162117",
+      "status": "ingested",
+      "action": "created",
+      "document_type": null,
+      "confidence": null
+    },
+    {
+      "timestamp": "2025-07-15T01:08:08.844516",
+      "status": "classified",
+      "action": "updated",
+      "document_type": "contract",
+      "confidence": 0.8
+    },
+    {
+      "timestamp": "2025-07-15T01:17:34.305731",
+      "status": "ingested",
+      "action": "updated",
+      "document_type": null,
+      "confidence": null
+    },
+    {
+      "timestamp": "2025-07-15T01:17:35.220796",
+      "status": "classified",
+      "action": "updated",
+      "document_type": "contract",
+      "confidence": 0.8
+    },
+    {
+      "timestamp": "2025-07-15T01:18:03.681045",
+      "status": "ingested",
+      "action": "updated",
+      "document_type": null,
+      "confidence": null
+    },
+    {
+      "timestamp": "2025-07-15T01:18:03.682057",
+      "status": "classified",
+      "action": "updated",
+      "document_type": "contract",
+      "confidence": 0.5
+    }
+  ]
+}

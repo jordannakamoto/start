@@ -37,7 +37,8 @@
       "Bash(pip install:*)",
       "Bash(source:*)",
       "Bash(pip3 install:*)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(touch:*)"
     ],
     "deny": []
   }

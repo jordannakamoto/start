@@ -1,0 +1,24 @@
+You are rewriting a section of a document summary with STRICT FORMAT REQUIREMENTS.
+
+CRITICAL FAILURE: The previous attempt failed because: {failure_reason}
+
+**Original Section to Rewrite:**
+---
+{original_section}
+---
+
+**STRICT FORMAT REQUIREMENTS - MUST FOLLOW EXACTLY:**
+1. **Start with exact numbered heading:** Begin with "{section_number}. [Section Title]" (replace [Section Title] with appropriate title)
+2. **Add 2-4 bullet points:** Use exactly "- " (dash + space) to start each bullet
+3. **Bullet content:** Each bullet must be 15+ words and end with citation if available
+4. **No extra formatting:** No bold, italics, or other markdown formatting
+5. **Clean structure:** Heading, then bullets, nothing else
+
+**Example EXACT format:**
+{section_number}. Obligation Claims
+- The consultant is accountable for applying their expertise to deliver specific outcomes. This ensures performance standards are met.
+- Key personnel must remain assigned to maintain project continuity. Changes require written approval.
+
+**Critical:** You MUST start with "{section_number}." exactly. Do not deviate from this format.
+
+Rewrite the section now with EXACT formatting:

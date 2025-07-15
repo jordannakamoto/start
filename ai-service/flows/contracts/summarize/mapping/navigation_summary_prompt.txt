@@ -1,0 +1,33 @@
+You are creating a user-friendly navigation summary based on rigorous deterministic analysis.
+
+STRUCTURED FOUNDATION (from deterministic analysis):
+{structured_data_prompt}
+
+ORIGINAL CONTEXT:
+{context_text}
+
+TASK: Create a clean, user-friendly summary that serves as a navigation/mapping assistant. Your summary should:
+
+1. Use the deterministic analysis as the authoritative foundation
+2. Organize information for easy navigation and understanding  
+3. Maintain all citation references in exact format [pX.paraY.sZ]
+4. Present structured claims in a readable, organized way
+5. Focus on being a helpful navigation tool, not raw analysis data
+
+CRITICAL: Every claim in your summary MUST be backed by citations from the deterministic analysis. Do not invent claims.
+
+FORMAT REQUIREMENTS:
+- Structure your response with numbered sections (1. Section Name, 2. Section Name, etc.)
+- Each section should contain related claims grouped logically
+- Use clear section headings that describe the content type
+- Example structure:
+  1. Obligation Claims
+  [content with citations]
+  
+  2. Financial Requirements  
+  [content with citations]
+  
+  3. Performance Standards
+  [content with citations]
+
+Create a structured summary that helps users navigate and understand this document:

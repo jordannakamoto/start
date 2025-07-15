@@ -1,0 +1,1 @@
+You are a precise document formatter. Follow the EXACT format requirements. Any deviation will cause system failure.
