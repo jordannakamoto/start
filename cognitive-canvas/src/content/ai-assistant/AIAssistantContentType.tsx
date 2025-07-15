@@ -11,6 +11,8 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { pdfHighlight, aiService } from '../../services/ContentCommunicationService';
 import { CitationParser } from '../../services/AIServiceClient';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 // --- Reusable Icon Components for a cleaner look ---
 const BotIcon = (props: React.SVGProps<SVGSVGElement>) => (
@@ -286,33 +288,148 @@ The highlight API is ready, but needs an active PDF document to demonstrate on.
 
   // Render message content with clickable citations
   const renderMessageContent = useCallback((message: Message) => {
-    if (!message.hasCitations) {
+    if (message.role === 'user') {
+      // User messages - simple text rendering
       return <p className="whitespace-pre-wrap">{message.content}</p>;
     }
 
+    // Assistant messages - process citations and render as markdown
+    if (!message.hasCitations) {
+      return (
+        <div className="prose prose-sm max-w-none dark:prose-invert">
+          <ReactMarkdown 
+            remarkPlugins={[remarkGfm]}
+            components={{
+              // Custom styling for markdown elements
+              p: ({children}) => <p className="mb-3 last:mb-0">{children}</p>,
+              ul: ({children}) => <ul className="list-disc pl-6 mb-3">{children}</ul>,
+              ol: ({children}) => <ol className="list-decimal pl-6 mb-3">{children}</ol>,
+              li: ({children}) => <li className="mb-1">{children}</li>,
+              code: ({children, ...props}) => {
+                const inline = !('className' in props);
+                return inline ? 
+                  <code className="bg-muted px-1.5 py-0.5 rounded text-sm font-mono">{children}</code> :
+                  <pre className="bg-muted p-3 rounded-lg overflow-x-auto mb-3"><code className="text-sm font-mono">{children}</code></pre>;
+              },
+              blockquote: ({children}) => <blockquote className="border-l-4 border-muted-foreground/30 pl-4 italic">{children}</blockquote>,
+              h1: ({children}) => <h1 className="text-xl font-bold mb-3">{children}</h1>,
+              h2: ({children}) => <h2 className="text-lg font-semibold mb-2">{children}</h2>,
+              h3: ({children}) => <h3 className="text-base font-semibold mb-2">{children}</h3>,
+              strong: ({children}) => <strong className="font-semibold">{children}</strong>,
+              em: ({children}) => <em className="italic">{children}</em>,
+              hr: () => <hr className="my-4 border-muted-foreground/20" />,
+              table: ({children}) => <table className="w-full border-collapse mb-3">{children}</table>,
+              th: ({children}) => <th className="border border-muted-foreground/20 px-3 py-2 text-left font-semibold">{children}</th>,
+              td: ({children}) => <td className="border border-muted-foreground/20 px-3 py-2">{children}</td>,
+            }}
+          >
+            {message.content}
+          </ReactMarkdown>
+        </div>
+      );
+    }
+
+    // Process content with citations
     const parts = CitationParser.replaceCitationsWithCallback(
       message.content,
       handleCitationClick
     );
 
+    // Convert parts array into markdown-compatible content
+    const processedContent = parts.map((part, index) => {
+      if (typeof part === 'string') {
+        return part;
+      } else {
+        // Return a placeholder that we'll replace in the markdown renderer
+        return `__CITATION_${index}__`;
+      }
+    }).join('');
+
     return (
-      <div className="whitespace-pre-wrap">
-        {parts.map((part, index) => {
-          if (typeof part === 'string') {
-            return <span key={index}>{part}</span>;
-          } else {
-            return (
-              <button
-                key={index}
-                onClick={part.onClick}
-                className="text-blue-600 hover:text-blue-800 underline bg-blue-50 hover:bg-blue-100 px-1 py-0.5 rounded text-sm transition-colors"
-                title={`Navigate to ${part.citation}`}
-              >
-                {part.citation}
-              </button>
-            );
-          }
-        })}
+      <div className="prose prose-sm max-w-none dark:prose-invert">
+        <ReactMarkdown 
+          remarkPlugins={[remarkGfm]}
+          components={{
+          // Custom styling for markdown elements
+          p: ({children}) => {
+            // Process children to replace citation placeholders
+            const processChildren = (child: any): any => {
+              if (typeof child === 'string') {
+                // Check if this string contains citation placeholders
+                const citationRegex = /__CITATION_(\d+)__/g;
+                const matches = [...child.matchAll(citationRegex)];
+                
+                if (matches.length === 0) return child;
+                
+                const result = [];
+                let lastIndex = 0;
+                
+                matches.forEach((match) => {
+                  const [fullMatch, indexStr] = match;
+                  const citationIndex = parseInt(indexStr);
+                  const part = parts[citationIndex];
+                  
+                  // Add text before citation
+                  if (match.index > lastIndex) {
+                    result.push(child.substring(lastIndex, match.index));
+                  }
+                  
+                  // Add citation button
+                  if (typeof part !== 'string') {
+                    result.push(
+                      <button
+                        key={`citation-${citationIndex}`}
+                        onClick={part.onClick}
+                        className="text-blue-600 hover:text-blue-800 underline bg-blue-50 hover:bg-blue-100 px-1 py-0.5 rounded text-sm transition-colors mx-0.5"
+                        title={`Navigate to ${part.citation}`}
+                      >
+                        {part.citation}
+                      </button>
+                    );
+                  }
+                  
+                  lastIndex = match.index + fullMatch.length;
+                });
+                
+                // Add remaining text
+                if (lastIndex < child.length) {
+                  result.push(child.substring(lastIndex));
+                }
+                
+                return result;
+              }
+              return child;
+            };
+            
+            const processedChildren = Array.isArray(children) 
+              ? children.map(processChildren).flat()
+              : processChildren(children);
+            
+            return <p className="mb-3 last:mb-0">{processedChildren}</p>;
+          },
+          ul: ({children}) => <ul className="list-disc pl-6 mb-3">{children}</ul>,
+          ol: ({children}) => <ol className="list-decimal pl-6 mb-3">{children}</ol>,
+          li: ({children}) => <li className="mb-1">{children}</li>,
+          code: ({children, ...props}) => {
+            const inline = !('className' in props);
+            return inline ? 
+              <code className="bg-muted px-1.5 py-0.5 rounded text-sm font-mono">{children}</code> :
+              <pre className="bg-muted p-3 rounded-lg overflow-x-auto mb-3"><code className="text-sm font-mono">{children}</code></pre>;
+          },
+          blockquote: ({children}) => <blockquote className="border-l-4 border-muted-foreground/30 pl-4 italic">{children}</blockquote>,
+          h1: ({children}) => <h1 className="text-xl font-bold mb-3">{children}</h1>,
+          h2: ({children}) => <h2 className="text-lg font-semibold mb-2">{children}</h2>,
+          h3: ({children}) => <h3 className="text-base font-semibold mb-2">{children}</h3>,
+          strong: ({children}) => <strong className="font-semibold">{children}</strong>,
+          em: ({children}) => <em className="italic">{children}</em>,
+          hr: () => <hr className="my-4 border-muted-foreground/20" />,
+          table: ({children}) => <table className="w-full border-collapse mb-3">{children}</table>,
+          th: ({children}) => <th className="border border-muted-foreground/20 px-3 py-2 text-left font-semibold">{children}</th>,
+          td: ({children}) => <td className="border border-muted-foreground/20 px-3 py-2">{children}</td>,
+        }}
+      >
+        {processedContent}
+      </ReactMarkdown>
       </div>
     );
   }, [handleCitationClick]);
@@ -364,12 +481,16 @@ The highlight API is ready, but needs an active PDF document to demonstrate on.
         {chatState.messages.map((message) => (
             <div key={message.id} className={`flex items-start gap-4 ${message.role === 'user' ? 'justify-end' : ''}`}>
               {message.role === 'assistant' && (
-                <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center">
+                <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
                   <BotIcon className="w-4 h-4 text-foreground" />
                 </div>
               )}
-               <div className={`group flex flex-col gap-1 max-w-[85%] ${message.role === 'user' ? 'items-end' : ''}`}>
-                  <div className={`px-4 py-2.5 rounded-lg text-sm ${ message.role === 'user' ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>
+               <div className={`group flex flex-col gap-1 ${message.role === 'user' ? 'max-w-[85%] items-end' : 'flex-1 min-w-0'}`}>
+                  <div className={`text-sm ${ 
+                    message.role === 'user' 
+                      ? 'px-4 py-2.5 rounded-lg bg-primary text-primary-foreground' 
+                      : 'text-foreground'
+                  }`}>
                     {renderMessageContent(message)}
                   </div>
                   <p className="text-xs text-muted-foreground">
@@ -377,7 +498,7 @@ The highlight API is ready, but needs an active PDF document to demonstrate on.
                   </p>
                </div>
               {message.role === 'user' && (
-                <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center">
+                <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center flex-shrink-0">
                   <UserIcon className="w-4 h-4 text-primary-foreground" />
                 </div>
               )}
@@ -386,14 +507,14 @@ The highlight API is ready, but needs an active PDF document to demonstrate on.
 
          {chatState.isTyping && (
             <div className="flex items-start gap-4">
-              <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center">
+              <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
                 <BotIcon className="w-4 h-4 text-foreground" />
               </div>
-              <div className="bg-muted rounded-lg px-4 py-3.5">
-                <div className="flex space-x-1.5">
-                  <div className="w-1.5 h-1.5 bg-muted-foreground/70 rounded-full animate-bounce"></div>
-                  <div className="w-1.5 h-1.5 bg-muted-foreground/70 rounded-full animate-bounce [animation-delay:0.15s]"></div>
-                  <div className="w-1.5 h-1.5 bg-muted-foreground/70 rounded-full animate-bounce [animation-delay:0.3s]"></div>
+              <div className="flex-1">
+                <div className="inline-flex space-x-1.5">
+                  <div className="w-2 h-2 bg-muted-foreground/50 rounded-full animate-bounce"></div>
+                  <div className="w-2 h-2 bg-muted-foreground/50 rounded-full animate-bounce [animation-delay:0.15s]"></div>
+                  <div className="w-2 h-2 bg-muted-foreground/50 rounded-full animate-bounce [animation-delay:0.3s]"></div>
                 </div>
               </div>
             </div>

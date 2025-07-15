@@ -35,7 +35,9 @@
       "Bash(python test_pdf_summary.py:*)",
       "Bash(python:*)",
       "Bash(pip install:*)",
-      "Bash(source:*)"
+      "Bash(source:*)",
+      "Bash(pip3 install:*)",
+      "Bash(grep:*)"
     ],
     "deny": []
   }

@@ -273,29 +273,29 @@ CRITICAL: Every claim MUST have a specific citation reference. No claim without 
         if "obligation" in claims_by_type:
             sections.append("## Key Obligations")
             for claim in claims_by_type["obligation"]:
-                citation_str = ", ".join(claim.citations)
-                sections.append(f"- {claim.content} `{citation_str}`")
+                citations_str = ", ".join(f"[{cit}]" for cit in claim.citations)
+                sections.append(f"- {claim.content} {citations_str}")
             sections.append("")
         
         if "right" in claims_by_type:
             sections.append("## Rights and Entitlements")
             for claim in claims_by_type["right"]:
-                citation_str = ", ".join(claim.citations)
-                sections.append(f"- {claim.content} `{citation_str}`")
+                citations_str = ", ".join(f"[{cit}]" for cit in claim.citations)
+                sections.append(f"- {claim.content} {citations_str}")
             sections.append("")
         
         if "definition" in claims_by_type:
             sections.append("## Key Definitions")
             for claim in claims_by_type["definition"]:
-                citation_str = ", ".join(claim.citations)
-                sections.append(f"- {claim.content} `{citation_str}`")
+                citations_str = ", ".join(f"[{cit}]" for cit in claim.citations)
+                sections.append(f"- {claim.content} {citations_str}")
             sections.append("")
         
         if "condition" in claims_by_type:
             sections.append("## Conditions and Requirements")
             for claim in claims_by_type["condition"]:
-                citation_str = ", ".join(claim.citations)
-                sections.append(f"- {claim.content} `{citation_str}`")
+                citations_str = ", ".join(f"[{cit}]" for cit in claim.citations)
+                sections.append(f"- {claim.content} {citations_str}")
             sections.append("")
         
         return sections
@@ -307,29 +307,29 @@ CRITICAL: Every claim MUST have a specific citation reference. No claim without 
         if "research_question" in claims_by_type:
             sections.append("## Research Questions")
             for claim in claims_by_type["research_question"]:
-                citation_str = ", ".join(claim.citations)
-                sections.append(f"- {claim.content} `{citation_str}`")
+                citations_str = ", ".join(f"[{cit}]" for cit in claim.citations)
+                sections.append(f"- {claim.content} {citations_str}")
             sections.append("")
         
         if "methodology" in claims_by_type:
             sections.append("## Methodology")
             for claim in claims_by_type["methodology"]:
-                citation_str = ", ".join(claim.citations)
-                sections.append(f"- {claim.content} `{citation_str}`")
+                citations_str = ", ".join(f"[{cit}]" for cit in claim.citations)
+                sections.append(f"- {claim.content} {citations_str}")
             sections.append("")
         
         if "finding" in claims_by_type:
             sections.append("## Key Findings")
             for claim in claims_by_type["finding"]:
-                citation_str = ", ".join(claim.citations)
-                sections.append(f"- {claim.content} `{citation_str}`")
+                citations_str = ", ".join(f"[{cit}]" for cit in claim.citations)
+                sections.append(f"- {claim.content} {citations_str}")
             sections.append("")
         
         if "conclusion" in claims_by_type:
             sections.append("## Conclusions")
             for claim in claims_by_type["conclusion"]:
-                citation_str = ", ".join(claim.citations)
-                sections.append(f"- {claim.content} `{citation_str}`")
+                citations_str = ", ".join(f"[{cit}]" for cit in claim.citations)
+                sections.append(f"- {claim.content} {citations_str}")
             sections.append("")
         
         return sections
@@ -341,22 +341,22 @@ CRITICAL: Every claim MUST have a specific citation reference. No claim without 
         if "requirement" in claims_by_type:
             sections.append("## Requirements")
             for claim in claims_by_type["requirement"]:
-                citation_str = ", ".join(claim.citations)
-                sections.append(f"- {claim.content} `{citation_str}`")
+                citations_str = ", ".join(f"[{cit}]" for cit in claim.citations)
+                sections.append(f"- {claim.content} {citations_str}")
             sections.append("")
         
         if "specification" in claims_by_type:
             sections.append("## Technical Specifications")
             for claim in claims_by_type["specification"]:
-                citation_str = ", ".join(claim.citations)
-                sections.append(f"- {claim.content} `{citation_str}`")
+                citations_str = ", ".join(f"[{cit}]" for cit in claim.citations)
+                sections.append(f"- {claim.content} {citations_str}")
             sections.append("")
         
         if "procedure" in claims_by_type:
             sections.append("## Procedures")
             for claim in claims_by_type["procedure"]:
-                citation_str = ", ".join(claim.citations)
-                sections.append(f"- {claim.content} `{citation_str}`")
+                citations_str = ", ".join(f"[{cit}]" for cit in claim.citations)
+                sections.append(f"- {claim.content} {citations_str}")
             sections.append("")
         
         return sections
@@ -368,22 +368,22 @@ CRITICAL: Every claim MUST have a specific citation reference. No claim without 
         if "main_point" in claims_by_type:
             sections.append("## Main Points")
             for claim in claims_by_type["main_point"]:
-                citation_str = ", ".join(claim.citations)
-                sections.append(f"- {claim.content} `{citation_str}`")
+                citations_str = ", ".join(f"[{cit}]" for cit in claim.citations)
+                sections.append(f"- {claim.content} {citations_str}")
             sections.append("")
         
         if "supporting_evidence" in claims_by_type:
             sections.append("## Supporting Evidence")
             for claim in claims_by_type["supporting_evidence"]:
-                citation_str = ", ".join(claim.citations)
-                sections.append(f"- {claim.content} `{citation_str}`")
+                citations_str = ", ".join(f"[{cit}]" for cit in claim.citations)
+                sections.append(f"- {claim.content} {citations_str}")
             sections.append("")
         
         if "conclusion" in claims_by_type:
             sections.append("## Conclusions")
             for claim in claims_by_type["conclusion"]:
-                citation_str = ", ".join(claim.citations)
-                sections.append(f"- {claim.content} `{citation_str}`")
+                citations_str = ", ".join(f"[{cit}]" for cit in claim.citations)
+                sections.append(f"- {claim.content} {citations_str}")
             sections.append("")
         
         return sections

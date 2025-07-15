@@ -8,6 +8,7 @@ from search_datastore import SearchDataStore
 from search_api import search_store
 from openai import AsyncOpenAI
 from enhanced_inference import EnhancedInferenceEngine
+from deterministic_analysis import DeterministicAnalysisEngine
 
 # Initialize environment
 load_dotenv()
@@ -15,10 +16,10 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 if not OPENAI_API_KEY:
     print("Warning: OPENAI_API_KEY is not set in .env. Using mock responses.")
     openai_client = None
-    enhanced_engine = None
-else:
-    openai_client = AsyncOpenAI(api_key=OPENAI_API_KEY)
-    enhanced_engine = EnhancedInferenceEngine(openai_client)
+
+openai_client = AsyncOpenAI(api_key=OPENAI_API_KEY) if OPENAI_API_KEY else None
+deterministic_engine = DeterministicAnalysisEngine()
+enhanced_inference_engine = EnhancedInferenceEngine(openai_client) if openai_client else None
 
 # PocketFlow core classes
 from pocketflow import Flow, AsyncFlow, Node, BatchFlow, AsyncNode
@@ -191,43 +192,40 @@ async def summarize_pdf_with_citations(pdf_id: str) -> dict:
         
         context_text = "\n".join(context_segments)
         
-        if openai_client and enhanced_engine:
-            # Use enhanced inference engine for citation-aware analysis
-            try:
-                analysis_result = await enhanced_engine.analyze_document(key_results)
+        # Two-stage analysis: Deterministic foundation + LLM navigation summary
+        try:
+            # Stage 1: Deterministic analysis for structured foundation
+            deterministic_result = deterministic_engine.analyze_document(key_results)
+            
+            # Log deterministic analysis metadata
+            metadata = deterministic_result['analysis_metadata']
+            print(f"🔍 Deterministic Analysis: {metadata['total_claims']} claims, {metadata['entities_found']} entities")
+            print(f"🔍 Claim types: {', '.join(metadata['claim_types'])}")
+            
+            # Stage 2: LLM creates navigation summary using deterministic data
+            if openai_client:
+                ai_summary = await _generate_navigation_summary_from_structured_data(
+                    deterministic_result, context_text, openai_client
+                )
+            else:
+                # Fallback to deterministic summary when no OpenAI client
+                ai_summary = deterministic_result['structured_summary']
                 
-                # Use only the clean user summary (no metadata)
-                ai_summary = analysis_result['user_summary']
-                
-                # Log internal analysis for debugging (not shown to user)
-                print(f"🔍 Enhanced Analysis: {analysis_result['citation_count']} citations validated")
-                
-            except Exception as e:
-                print(f"Enhanced analysis failed, falling back to basic summary: {e}")
-                # Fallback to basic summarization
+        except Exception as e:
+            print(f"Analysis failed, falling back to basic summary: {e}")
+            if openai_client:
                 ai_summary = await _generate_basic_summary(context_text, openai_client)
-        elif openai_client:
-            # Fallback to basic summarization
-            ai_summary = await _generate_basic_summary(context_text, openai_client)
-        else:
-            # Mock summary when no API key
-            ai_summary = f"""# PDF Summary
+            else:
+                ai_summary = f"""# PDF Summary
 
-## Key Points
+## Analysis Error
+An error occurred during document analysis: {str(e)}
 
-Based on the analysis of this document, here are the main findings:
+## Available Data
+- Total segments processed: {len(key_results)}
+- Citations available: {len(citations)}
 
-1. **Primary Topic**: The document discusses important concepts and methodologies {citations[0] if citations else '[p1.para1.s1]'}
-
-2. **Key Insights**: Several significant conclusions were drawn from the analysis {citations[1] if len(citations) > 1 else '[p1.para2.s1]'}
-
-3. **Important Details**: The document provides comprehensive information on the subject matter {citations[2] if len(citations) > 2 else '[p2.para1.s1]'}
-
-## Conclusion
-
-This document presents valuable information that contributes to understanding the topic {citations[-1] if citations else '[p2.para2.s1]'}.
-
-*Note: This is a mock summary. Configure OpenAI API key for real AI-powered summaries.*"""
+*The document has been processed and indexed for search capabilities.*"""
         
         # Extract citations from the response
         import re
@@ -248,6 +246,95 @@ This document presents valuable information that contributes to understanding th
             "has_citations": False,
             "error": str(e)
         }
+
+async def _generate_navigation_summary_from_structured_data(deterministic_result: dict, context_text: str, openai_client) -> str:
+    """Generate user-friendly navigation summary using deterministic analysis as foundation"""
+    
+    # Extract structured data
+    knowledge_graph = deterministic_result['knowledge_graph']
+    validated_claims = deterministic_result['validated_claims']
+    metadata = deterministic_result['analysis_metadata']
+    
+    # Build prompt with structured foundation
+    structured_data_prompt = _build_structured_data_prompt(validated_claims, knowledge_graph, metadata)
+    
+    prompt = f"""You are creating a user-friendly navigation summary based on rigorous deterministic analysis.
+
+STRUCTURED FOUNDATION (from deterministic analysis):
+{structured_data_prompt}
+
+ORIGINAL CONTEXT:
+{context_text[:1500]}...
+
+TASK: Create a clean, user-friendly summary that serves as a navigation/mapping assistant. Your summary should:
+
+1. Use the deterministic analysis as the authoritative foundation
+2. Organize information for easy navigation and understanding  
+3. Maintain all citation references in exact format [pX.paraY.sZ]
+4. Present structured claims in a readable, organized way
+5. Focus on being a helpful navigation tool, not raw analysis data
+
+CRITICAL: Every claim in your summary MUST be backed by citations from the deterministic analysis. Do not invent claims.
+
+Create a structured summary that helps users navigate and understand this document:"""
+
+    try:
+        response = await openai_client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": "You are an expert document navigator. Create user-friendly summaries that preserve structured analysis while being readable and helpful for navigation."},
+                {"role": "user", "content": prompt}
+            ],
+            max_tokens=2000,
+            temperature=0.2
+        )
+        
+        return response.choices[0].message.content
+        
+    except Exception as e:
+        print(f"Navigation summary generation failed: {e}")
+        # Fallback to deterministic summary
+        return deterministic_result['structured_summary']
+
+def _build_structured_data_prompt(claims: list, knowledge_graph, metadata: dict) -> str:
+    """Build prompt section with structured deterministic data"""
+    
+    prompt_parts = [
+        f"ANALYSIS METADATA:",
+        f"- Total validated claims: {metadata['total_claims']}",
+        f"- Claim types found: {', '.join(metadata['claim_types'])}",
+        f"- Entities identified: {metadata['entities_found']}",
+        f"- Relationships mapped: {metadata['relationships_found']}",
+        "",
+        "VALIDATED CLAIMS (with citations):"
+    ]
+    
+    # Group claims by type for better organization
+    claims_by_type = {}
+    for claim in claims:
+        claim_type = claim.claim_type
+        if claim_type not in claims_by_type:
+            claims_by_type[claim_type] = []
+        claims_by_type[claim_type].append(claim)
+    
+    for claim_type, type_claims in claims_by_type.items():
+        prompt_parts.append(f"\n{claim_type.upper()} CLAIMS:")
+        for claim in type_claims:
+            citations_str = ", ".join(f"[{cit}]" for cit in claim.citations)
+            prompt_parts.append(f"  - {claim.subject} {claim.predicate} {claim.object or ''} {citations_str}")
+            if claim.conditions:
+                prompt_parts.append(f"    Conditions: {'; '.join(claim.conditions)}")
+            if claim.temporal_scope:
+                prompt_parts.append(f"    Timeline: {claim.temporal_scope}")
+    
+    # Add key entities
+    if knowledge_graph.entities:
+        prompt_parts.append("\nKEY ENTITIES:")
+        for entity_id, entity_data in list(knowledge_graph.entities.items())[:10]:
+            citation = entity_data.get('citation', 'unknown')
+            prompt_parts.append(f"  - {entity_data['text']} ({entity_data.get('label', 'ENTITY')}) [{citation}]")
+    
+    return "\n".join(prompt_parts)
 
 async def _generate_basic_summary(context_text: str, openai_client) -> str:
     """Fallback basic summarization function"""
