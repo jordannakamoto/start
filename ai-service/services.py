@@ -231,7 +231,6 @@ An error occurred during document analysis: {str(e)}
 *The document has been processed and indexed for search capabilities.*"""
         
         # Extract citations from the response
-        import re
         citation_pattern = r'\[p\d+\.para\d+\.s\d+\]'
         found_citations = re.findall(citation_pattern, ai_summary)
         
@@ -278,6 +277,20 @@ TASK: Create a clean, user-friendly summary that serves as a navigation/mapping 
 5. Focus on being a helpful navigation tool, not raw analysis data
 
 CRITICAL: Every claim in your summary MUST be backed by citations from the deterministic analysis. Do not invent claims.
+
+FORMAT REQUIREMENTS:
+- Structure your response with numbered sections (1. Section Name, 2. Section Name, etc.)
+- Each section should contain related claims grouped logically
+- Use clear section headings that describe the content type
+- Example structure:
+  1. Obligation Claims
+  [content with citations]
+  
+  2. Financial Requirements  
+  [content with citations]
+  
+  3. Performance Standards
+  [content with citations]
 
 Create a structured summary that helps users navigate and understand this document:"""
 
@@ -378,15 +391,41 @@ async def rewrite_summary_to_strategic_briefing(original_summary_text: str, open
     """
 
     # --- Step 1: Divide the document into sections ---
-    # We use regex to split the text at each numbered heading (e.g., "1. ", "2. ").
-    # The (?=...) is a positive lookahead to keep the delimiter in the split parts.
-    sections = re.split(r'\n(?=\d+\.\s)', original_summary_text)
+    # Try multiple patterns to detect sections
+    sections = []
+    
+    # Try numbered headings like "1. ", "2. "
+    numbered_sections = re.split(r'\n(?=\d+\.\s)', original_summary_text)
+    if len(numbered_sections) > 1:
+        sections = [s.strip() for s in numbered_sections[1:] if s.strip()]
+    else:
+        # Try ## headings
+        header_sections = re.split(r'\n(?=##\s)', original_summary_text)
+        if len(header_sections) > 1:
+            sections = [s.strip() for s in header_sections[1:] if s.strip()]
+        else:
+            # Try finding sections by keywords like "CLAIMS:", "ENTITIES:", etc.
+            keyword_sections = re.split(r'\n(?=[A-Z][A-Z\s]+:)', original_summary_text)
+            if len(keyword_sections) > 1:
+                sections = [s.strip() for s in keyword_sections[1:] if s.strip()]
+            else:
+                # Fallback: split by double newlines and take substantial chunks
+                para_sections = [s.strip() for s in original_summary_text.split('\n\n') if len(s.strip()) > 100]
+                sections = para_sections
+    
+    sections_to_rewrite = sections
 
-    # The first part is the intro, which we'll discard and replace. The rest are the sections to rewrite.
-    # We filter out any empty strings that might result from the split.
-    sections_to_rewrite = [s.strip() for s in sections[1:] if s.strip()]
+    # Debug: Print what sections we found
+    print(f"🔍 Strategic rewrite: Found {len(sections_to_rewrite)} sections to rewrite")
+    for i, section in enumerate(sections_to_rewrite):
+        print(f"🔍 Section {i+1}: {section[:100]}...")
 
     # --- Step 2: Create a rewrite task for each section ---
+    if not sections_to_rewrite:
+        # If no sections found, treat the whole text as one section
+        print("🔍 No sections detected, treating whole text as single section")
+        sections_to_rewrite = [original_summary_text]
+    
     tasks = []
     for section_text in sections_to_rewrite:
         tasks.append(_rewrite_section_strategically(section_text, openai_client))
@@ -395,8 +434,8 @@ async def rewrite_summary_to_strategic_briefing(original_summary_text: str, open
     rewritten_sections = await asyncio.gather(*tasks)
 
     # --- Step 4: Assemble the final strategic briefing ---
-    # Frame the rewritten content with a new, authoritative introduction.
-    strategic_introduction = "This briefing outlines the strategic framework of the agreement, focusing on key areas of performance, risk, and operational control."
+    # Frame the rewritten content with a new, direct introduction.
+    strategic_introduction = "A Briefing on Consultant Responsibilities\nTo ensure this project aligns with our strategic goals, the consultant's engagement is governed by the following core commitments."
     
     # Join the high-quality rewritten sections together.
     final_body = "\n\n".join(rewritten_sections)
@@ -408,8 +447,7 @@ async def _rewrite_section_strategically(section_text: str, openai_client) -> st
     """
     Worker function to rewrite a single section of text into a strategic tone.
     """
-    prompt = f"""You are rewriting a single section of a legal summary for an executive briefing. 
-Your task is to transform the following section into a concise, strategic paragraph.
+    prompt = f"""You are rewriting a section of a document summary into clear, direct bullet points for an executive briefing.
 
 **Original Section to Rewrite:**
 ---
@@ -417,21 +455,25 @@ Your task is to transform the following section into a concise, strategic paragr
 ---
 
 **Your Instructions:**
-1.  **Synthesize, Don't List:** Transform the list of claims into a flowing paragraph or a very tight, strategic bulleted list.
-2.  **Focus on Business Implications:** Reframe the points to highlight their purpose (e.g., "To ensure performance," "To maintain financial control," "To define clear terms").
-3.  **Discard the Old Header:** Do not include the original numbered header (e.g., "1. Obligation Claims"). The new text must stand on its own.
-4.  **Maintain All Citations:** Preserve every citation (e.g., [p1.para2.s3]) exactly as it appears, attached to its corresponding point.
-5.  **Use an Authoritative Tone:** The language should be confident, clear, and professional.
+1. **Convert to Clean Bullet Points:** Transform the content into 2-4 tight, direct bullet points (use "•" or "-")
+2. **Use Direct Language:** Write in a clear, authoritative tone. Focus on what "must" happen, what "is required", etc.
+3. **Business Focus:** Frame each point around business outcomes, control, oversight, or strategic goals
+4. **Preserve All Citations:** Keep every citation (e.g., [p1.para2.s3]) exactly as shown, placed naturally within each bullet point
+5. **Remove Headers:** Don't include the original section header (e.g., "1. Obligation Claims")
+6. **Be Concise:** Each bullet should be 1-2 sentences maximum
 
-Rewrite the section now.
-"""
+Example style:
+- The consultant is accountable for applying their expertise to deliver the specific outcomes defined in Exhibit A [p1.para2.s3]. The work must meet our standards of quality.
+- Key personnel assigned to this project must remain in place [p2.para1.s1]. Changes require our prior written consent to ensure continuity.
+
+Rewrite the section now as clean bullet points:"""
     try:
         response = await openai_client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
                 {
                     "role": "system",
-                    "content": "You are a top-tier strategy consultant who excels at turning dense information into clear, actionable executive insights. Your tone is authoritative and precise."
+                    "content": "You are an executive briefing specialist. Create clean, direct bullet points that executives can quickly scan and understand. Focus on accountability, control, and business outcomes."
                 },
                 {
                     "role": "user",
