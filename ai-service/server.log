@@ -1582,3 +1582,117 @@ INFO:     Waiting for application startup.
 INFO:     Application startup complete.
 🔍 spaCy not available, using lightweight analysis
 INFO:     127.0.0.1:55455 - "POST /assistant-message HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55475 - "OPTIONS /ingest-pdf HTTP/1.1" 200 OK
+/Users/jordannakamoto/start/ai-service/pocketflow.py:7: UserWarning: Overwriting successor for action 'default'
+  if action in self.successors: warnings.warn(f"Overwriting successor for action '{action}'")
+🔍 DEBUG: Received 1 pages
+🔍 DEBUG: Total characters: 31201
+🔍 DEBUG: Page 1: 31201 characters
+🔍 DEBUG: Page 1 preview: Sample ContractContract No.___________PROFESSIONAL SERVICES AGREEMENTTHIS AGREEMENT made and entered...
+INFO:     127.0.0.1:55475 - "POST /ingest-pdf HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55475 - "OPTIONS /assistant-message HTTP/1.1" 200 OK
+🔍 Starting deterministic analysis of 50 segments
+🔍 Deterministic Analysis: 122 claims, 19 entities
+🔍 Claim types: conditional, obligation, prohibition, statement, permission, definition
+🔍 Strategic rewrite: Found 8 sections to rewrite
+🔍 Section 1: ## 1. Obligation Claims
+- **Consultant Duties**: The CONSULTANT agrees to exercise special skill to ...
+🔍 Section 2: ## 2. Financial Requirements
+- **Compensation Structure**: The COMMISSION agrees to pay the CONSULTA...
+🔍 Section 3: ## 3. Performance Standards
+- **Deliverable Items**: The COMMISSION may delay payment and/or termina...
+🔍 Section 4: ## 4. Termination Clauses
+- **Termination for Convenience**: The COMMISSION may terminate this Agree...
+🔍 Section 5: ## 5. Indemnification and Liability
+- **Indemnification**: The CONSULTANT shall indemnify, defend, a...
+🔍 Section 6: ## 6. Insurance Requirements
+- **Insurance Coverage**: The CONSULTANT must maintain insurance covera...
+🔍 Section 7: ## 7. Definitions
+- **Scope of Services**: The term "results in a manner reasonably satisfactory to ...
+🔍 Section 8: ## 8. Key Entities
+- **Consultant**: The party providing services under this Agreement. [p1.para5.s2...
+INFO:     127.0.0.1:55475 - "POST /assistant-message HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55475 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55475 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55475 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55475 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55475 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55475 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55475 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55475 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55475 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55475 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55475 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55475 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55475 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55475 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55475 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55475 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55475 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55475 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55475 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55475 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55475 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55475 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55475 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55475 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55475 - "POST /resolve-citation HTTP/1.1" 200 OK
+WARNING:  WatchFiles detected changes in 'services.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [41221]
+Python(41659) MallocStackLogging: can't turn off malloc stack logging because it was not enabled.
+INFO:     Started server process [41659]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+🔍 spaCy not available, using lightweight analysis
+INFO:     127.0.0.1:55515 - "POST /assistant-message HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55531 - "OPTIONS /ingest-pdf HTTP/1.1" 200 OK
+/Users/jordannakamoto/start/ai-service/pocketflow.py:7: UserWarning: Overwriting successor for action 'default'
+  if action in self.successors: warnings.warn(f"Overwriting successor for action '{action}'")
+🔍 DEBUG: Received 1 pages
+🔍 DEBUG: Total characters: 31201
+🔍 DEBUG: Page 1: 31201 characters
+🔍 DEBUG: Page 1 preview: Sample ContractContract No.___________PROFESSIONAL SERVICES AGREEMENTTHIS AGREEMENT made and entered...
+INFO:     127.0.0.1:55531 - "POST /ingest-pdf HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55531 - "OPTIONS /assistant-message HTTP/1.1" 200 OK
+🔍 Starting deterministic analysis of 50 segments
+🔍 Deterministic Analysis: 122 claims, 19 entities
+🔍 Claim types: obligation, statement, prohibition, permission, definition, conditional
+🔍 Strategic rewrite: Found 7 sections to rewrite
+🔍 Section 1: ## 1. Obligation Claims
+- **Consultant Duties**: The CONSULTANT agrees to exercise special skill to ...
+🔍 Section 2: ## 2. Financial Requirements
+- **Compensation Structure**: The total payment is not to exceed a spec...
+🔍 Section 3: ## 3. Performance Standards
+- **Detailed Reporting**: Reports must be sufficiently detailed for the ...
+🔍 Section 4: ## 4. Termination Clauses
+- **Termination for Convenience**: The COMMISSION may terminate this Agree...
+🔍 Section 5: ## 5. Insurance Requirements
+- **Insurance Coverage**: The CONSULTANT must maintain specified insura...
+🔍 Section 6: ## 6. Conditional Clauses
+- **Conditional Payments**: A pro-rata portion of the CONSULTANT’s fixed f...
+🔍 Section 7: ## 7. Definitions
+- **Scope of Services**: The results the CONSULTANT is to achieve are defined in E...
+INFO:     127.0.0.1:55531 - "POST /assistant-message HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55531 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55531 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55531 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55531 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55531 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55531 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55531 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55531 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55531 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55531 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55531 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55531 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55531 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55531 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55531 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55531 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55531 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55531 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55531 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55531 - "POST /resolve-citation HTTP/1.1" 200 OK

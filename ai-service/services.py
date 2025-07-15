@@ -455,18 +455,19 @@ async def _rewrite_section_strategically(section_text: str, openai_client) -> st
 ---
 
 **Your Instructions:**
-1. **Convert to Clean Bullet Points:** Transform the content into 2-4 tight, direct bullet points (use "•" or "-")
-2. **Use Direct Language:** Write in a clear, authoritative tone. Focus on what "must" happen, what "is required", etc.
-3. **Business Focus:** Frame each point around business outcomes, control, oversight, or strategic goals
-4. **Preserve All Citations:** Keep every citation (e.g., [p1.para2.s3]) exactly as shown, placed naturally within each bullet point
-5. **Remove Headers:** Don't include the original section header (e.g., "1. Obligation Claims")
+1. **Keep the Section Header:** If the section starts with a numbered heading (e.g., "1. Obligation Claims"), preserve it exactly as the first line
+2. **Convert Content to Bullet Points:** Transform the body content into 2-4 tight, direct bullet points (use "-")
+3. **Use Direct Language:** Write in a clear, authoritative tone. Focus on what "must" happen, what "is required", etc.
+4. **Business Focus:** Frame each point around business outcomes, control, oversight, or strategic goals
+5. **Preserve All Citations:** Keep every citation (e.g., [p1.para2.s3]) exactly as shown, placed naturally within each bullet point
 6. **Be Concise:** Each bullet should be 1-2 sentences maximum
 
-Example style:
+Example output format:
+1. Obligation Claims
 - The consultant is accountable for applying their expertise to deliver the specific outcomes defined in Exhibit A [p1.para2.s3]. The work must meet our standards of quality.
 - Key personnel assigned to this project must remain in place [p2.para1.s1]. Changes require our prior written consent to ensure continuity.
 
-Rewrite the section now as clean bullet points:"""
+Rewrite the section now, preserving the numbered header and converting content to bullet points:"""
     try:
         response = await openai_client.chat.completions.create(
             model="gpt-4o-mini",
