@@ -34,6 +34,16 @@ const SendIcon = (props: React.SVGProps<SVGSVGElement>) => (
 );
 
 
+interface StructuredBullet {
+  text: string;
+  citations: string[];
+}
+
+interface StructuredSection {
+  title: string;
+  bullets: StructuredBullet[];
+}
+
 interface Message {
   id: string;
   role: 'user' | 'assistant';
@@ -41,6 +51,7 @@ interface Message {
   timestamp: number;
   citations?: string[];
   hasCitations?: boolean;
+  structuredSections?: StructuredSection[];
 }
 
 interface ChatState {
@@ -102,14 +113,15 @@ function AIAssistantEditor({ documentId, content, onContentChange }: ContentEdit
   }, [inputValue]);
 
 
-  const addMessage = useCallback((role: 'user' | 'assistant', messageContent: string, citations?: string[]) => {
+  const addMessage = useCallback((role: 'user' | 'assistant', messageContent: string, citations?: string[], structuredSections?: StructuredSection[]) => {
     const newMessage: Message = { 
       id: `msg_${Date.now()}`, 
       role, 
       content: messageContent, 
       timestamp: Date.now(),
       citations,
-      hasCitations: citations && citations.length > 0
+      hasCitations: citations && citations.length > 0,
+      structuredSections
     };
     setChatState(prev => ({ ...prev, messages: [...prev.messages, newMessage] }));
   }, []);
@@ -179,20 +191,25 @@ function AIAssistantEditor({ documentId, content, onContentChange }: ContentEdit
       try {
         const summary = await aiService.summarizePDF(document.documentId);
         
-        if (summary.has_citations) {
-          // Extract citations from response
-          const citations = CitationParser.extractCitations(summary.response);
+        setChatState(prev => ({ ...prev, isTyping: false }));
+        
+        if (summary.structured_sections && summary.structured_sections.length > 0) {
+          // Use new structured format for clickable bullets
+          addMessage('assistant', summary.response, summary.citations, summary.structured_sections);
           
-          // Add AI summary with citations
-          setChatState(prev => ({ ...prev, isTyping: false }));
+          // Highlight all citations in PDF
+          if (summary.citations && summary.citations.length > 0) {
+            await aiService.highlightCitations(document.documentId, summary.citations);
+          }
+        } else if (summary.has_citations) {
+          // Fallback to old citation format
+          const citations = CitationParser.extractCitations(summary.response);
           addMessage('assistant', summary.response, citations);
           
-          // Highlight citations in PDF
           if (citations.length > 0) {
             await aiService.highlightCitations(document.documentId, citations);
           }
         } else {
-          setChatState(prev => ({ ...prev, isTyping: false }));
           addMessage('assistant', summary.response);
         }
       } catch (error) {
@@ -286,11 +303,55 @@ The highlight API is ready, but needs an active PDF document to demonstrate on.
     }
   }, [addMessage]);
 
+  // Render structured sections with clickable bullets
+  const renderStructuredSections = useCallback((sections: StructuredSection[]) => {
+    return (
+      <div className="space-y-6">
+        <div className="mb-4">
+          <h2 className="text-lg font-semibold mb-2">A Briefing on Consultant Responsibilities</h2>
+          <p className="text-sm text-muted-foreground mb-4">To ensure this project aligns with our strategic goals, the consultant's engagement is governed by the following core commitments.</p>
+        </div>
+        
+        {sections.map((section, sectionIndex) => (
+          <div key={sectionIndex} className="mb-6">
+            <h3 className="font-semibold mb-3">{section.title}</h3>
+            <ul className="space-y-2">
+              {section.bullets.map((bullet, bulletIndex) => (
+                <li 
+                  key={bulletIndex}
+                  className="cursor-pointer hover:bg-muted/50 p-2 rounded transition-colors duration-200 group"
+                  onClick={() => {
+                    // Handle multiple citations in a bullet
+                    if (bullet.citations.length > 0) {
+                      handleCitationClick(bullet.citations[0]);
+                    }
+                  }}
+                >
+                  <div className="flex items-start space-x-2">
+                    <span className="text-muted-foreground mt-1">•</span>
+                    <span className="text-sm group-hover:text-primary transition-colors">
+                      {bullet.text}
+                    </span>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
+      </div>
+    );
+  }, [handleCitationClick]);
+
   // Render message content with clickable citations
   const renderMessageContent = useCallback((message: Message) => {
     if (message.role === 'user') {
       // User messages - simple text rendering
       return <p className="whitespace-pre-wrap">{message.content}</p>;
+    }
+
+    // Check if we have structured sections for new format
+    if (message.structuredSections && message.structuredSections.length > 0) {
+      return renderStructuredSections(message.structuredSections);
     }
 
     // Assistant messages - process citations and render as markdown

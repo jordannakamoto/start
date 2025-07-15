@@ -1696,3 +1696,116 @@ INFO:     127.0.0.1:55531 - "POST /resolve-citation HTTP/1.1" 200 OK
 INFO:     127.0.0.1:55531 - "POST /resolve-citation HTTP/1.1" 200 OK
 INFO:     127.0.0.1:55531 - "POST /resolve-citation HTTP/1.1" 200 OK
 INFO:     127.0.0.1:55531 - "POST /resolve-citation HTTP/1.1" 200 OK
+WARNING:  WatchFiles detected changes in 'services.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [41659]
+Python(42937) MallocStackLogging: can't turn off malloc stack logging because it was not enabled.
+INFO:     Started server process [42937]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'services.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [42937]
+Python(42960) MallocStackLogging: can't turn off malloc stack logging because it was not enabled.
+INFO:     Started server process [42960]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'services.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [42960]
+Python(42973) MallocStackLogging: can't turn off malloc stack logging because it was not enabled.
+INFO:     Started server process [42973]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+/Users/jordannakamoto/start/ai-service/pocketflow.py:7: UserWarning: Overwriting successor for action 'default'
+  if action in self.successors: warnings.warn(f"Overwriting successor for action '{action}'")
+🔍 spaCy not available, using lightweight analysis
+🔍 DEBUG: Received 1 pages
+🔍 DEBUG: Total characters: 31201
+🔍 DEBUG: Page 1: 31201 characters
+🔍 DEBUG: Page 1 preview: Sample ContractContract No.___________PROFESSIONAL SERVICES AGREEMENTTHIS AGREEMENT made and entered...
+INFO:     127.0.0.1:55820 - "POST /ingest-pdf HTTP/1.1" 200 OK
+🔍 Starting deterministic analysis of 50 segments
+🔍 Deterministic Analysis: 122 claims, 19 entities
+🔍 Claim types: conditional, obligation, permission, prohibition, definition, statement
+🔍 Strategic rewrite: Found 6 sections to rewrite
+🔍 Section 1: ## 1. Obligation Claims
+- **Consultant Duties**: The CONSULTANT agrees to exercise special skill to ...
+🔍 Section 2: ## 2. Financial Requirements
+- **Compensation Structure**: The total payment to the CONSULTANT is no...
+🔍 Section 3: ## 3. Performance Standards
+- **Key Personnel Changes**: No key personnel shall be removed or replac...
+🔍 Section 4: ## 4. Termination Clauses
+- **Termination for Convenience**: The COMMISSION may terminate the Agreem...
+🔍 Section 5: ## 5. Insurance Requirements
+- **Insurance Coverage**: The CONSULTANT must maintain specified insura...
+🔍 Section 6: ## 6. Definitions
+- **Scope of Services**: The results the CONSULTANT is to achieve are defined as s...
+INFO:     127.0.0.1:55908 - "OPTIONS /ingest-pdf HTTP/1.1" 200 OK
+/Users/jordannakamoto/start/ai-service/pocketflow.py:7: UserWarning: Overwriting successor for action 'default'
+  if action in self.successors: warnings.warn(f"Overwriting successor for action '{action}'")
+🔍 DEBUG: Received 1 pages
+🔍 DEBUG: Total characters: 31201
+🔍 DEBUG: Page 1: 31201 characters
+🔍 DEBUG: Page 1 preview: Sample ContractContract No.___________PROFESSIONAL SERVICES AGREEMENTTHIS AGREEMENT made and entered...
+INFO:     127.0.0.1:55908 - "POST /ingest-pdf HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55908 - "OPTIONS /assistant-message HTTP/1.1" 200 OK
+🔍 Starting deterministic analysis of 50 segments
+🔍 Deterministic Analysis: 122 claims, 19 entities
+🔍 Claim types: conditional, obligation, permission, prohibition, definition, statement
+🔍 Strategic rewrite: Found 7 sections to rewrite
+🔍 Section 1: ## 1. Obligation Claims
+- **Consultant's Duties**: The CONSULTANT agrees to exercise special skill t...
+🔍 Section 2: ## 2. Financial Requirements
+- **Payment Conditions**: No payment will be made prior to approval of ...
+🔍 Section 3: ## 3. Performance Standards
+- **Detailed Reporting**: Reports must be sufficiently detailed for the ...
+🔍 Section 4: ## 4. Insurance Requirements
+- **Types of Insurance**: The CONSULTANT must maintain Workers’ Compens...
+🔍 Section 5: ## 5. Termination Clauses
+- **Commission's Right to Terminate**: The COMMISSION may terminate the Ag...
+🔍 Section 6: ## 6. Definitions
+- **Scope of Services**: The results the CONSULTANT is expected to achieve are def...
+🔍 Section 7: ## 7. Conditional Clauses
+- **Termination Conditions**: The Agreement shall end on (DATE), unless ea...
+INFO:     127.0.0.1:55908 - "POST /assistant-message HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55908 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55908 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55908 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55908 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55908 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55908 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55908 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55908 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55908 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55908 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55908 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55908 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55908 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55908 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55908 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55908 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55908 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55908 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55908 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55908 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55908 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55908 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55908 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55908 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55908 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55908 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55908 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55908 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55917 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55919 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55921 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55923 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55925 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55927 - "POST /resolve-citation HTTP/1.1" 200 OK

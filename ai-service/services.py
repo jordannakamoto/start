@@ -230,12 +230,16 @@ An error occurred during document analysis: {str(e)}
 
 *The document has been processed and indexed for search capabilities.*"""
         
-        # Extract citations from the response
+        # Extract citations and create structured bullet points
         citation_pattern = r'\[p\d+\.para\d+\.s\d+\]'
         found_citations = re.findall(citation_pattern, ai_summary)
         
+        # Parse bullet points and associate citations
+        structured_sections = _parse_bullet_points_with_citations(ai_summary)
+        
         return {
             "response": ai_summary,
+            "structured_sections": structured_sections,
             "citations": found_citations,
             "has_citations": len(found_citations) > 0,
             "pdf_id": pdf_id
@@ -459,13 +463,13 @@ async def _rewrite_section_strategically(section_text: str, openai_client) -> st
 2. **Convert Content to Bullet Points:** Transform the body content into 2-4 tight, direct bullet points (use "-")
 3. **Use Direct Language:** Write in a clear, authoritative tone. Focus on what "must" happen, what "is required", etc.
 4. **Business Focus:** Frame each point around business outcomes, control, oversight, or strategic goals
-5. **Preserve All Citations:** Keep every citation (e.g., [p1.para2.s3]) exactly as shown, placed naturally within each bullet point
+5. **Keep Citations Hidden:** Include all citation references (e.g., [p1.para2.s3]) at the end of each bullet point for backend processing, but the frontend will make the entire bullet clickable
 6. **Be Concise:** Each bullet should be 1-2 sentences maximum
 
 Example output format:
 1. Obligation Claims
-- The consultant is accountable for applying their expertise to deliver the specific outcomes defined in Exhibit A [p1.para2.s3]. The work must meet our standards of quality.
-- Key personnel assigned to this project must remain in place [p2.para1.s1]. Changes require our prior written consent to ensure continuity.
+- The consultant is accountable for applying their expertise to deliver the specific outcomes defined in Exhibit A. The work must meet our standards of quality. [p1.para2.s3]
+- Key personnel assigned to this project must remain in place. Changes require our prior written consent to ensure continuity. [p2.para1.s1]
 
 Rewrite the section now, preserving the numbered header and converting content to bullet points:"""
     try:
@@ -488,6 +492,49 @@ Rewrite the section now, preserving the numbered header and converting content t
     except Exception as e:
         print(f"Failed to rewrite section: {e}")
         return f"[Rewrite failed for section: {section_text[:50]}...]"
+
+def _parse_bullet_points_with_citations(summary_text: str) -> list:
+    """
+    Parse the summary into structured sections with bullet points and their citations.
+    Returns a list of sections, each with title and clickable bullet points.
+    """
+    sections = []
+    
+    # Split by numbered headings
+    section_splits = re.split(r'\n(\d+\.\s[^\n]+)', summary_text)
+    
+    # Skip intro, process sections
+    for i in range(1, len(section_splits), 2):
+        if i + 1 < len(section_splits):
+            title = section_splits[i].strip()
+            content = section_splits[i + 1].strip()
+            
+            # Extract bullet points
+            bullet_lines = [line.strip() for line in content.split('\n') if line.strip().startswith('-')]
+            
+            bullets = []
+            for bullet in bullet_lines:
+                # Extract citations from this bullet
+                citation_pattern = r'\[p\d+\.para\d+\.s\d+\]'
+                bullet_citations = re.findall(citation_pattern, bullet)
+                
+                # Remove citations from display text
+                clean_text = re.sub(citation_pattern, '', bullet).strip()
+                # Remove leading dash and clean up
+                clean_text = re.sub(r'^-\s*', '', clean_text).strip()
+                
+                bullets.append({
+                    "text": clean_text,
+                    "citations": bullet_citations
+                })
+            
+            if bullets:  # Only add sections with bullet points
+                sections.append({
+                    "title": title,
+                    "bullets": bullets
+                })
+    
+    return sections
 
 async def resolve_citation(pdf_id: str, citation: str) -> dict:
     """
