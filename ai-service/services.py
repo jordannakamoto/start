@@ -1,5 +1,6 @@
 import os
 import hashlib
+import re
 import asyncio
 from dotenv import load_dotenv
 from models import PDFIngestRequest, AssistantMessageRequest
@@ -207,6 +208,8 @@ async def summarize_pdf_with_citations(pdf_id: str) -> dict:
                 ai_summary = await _generate_navigation_summary_from_structured_data(
                     deterministic_result, context_text, openai_client
                 )
+                # Stage 3: Apply strategic briefing tone
+                ai_summary = await rewrite_summary_to_strategic_briefing(ai_summary, openai_client)
             else:
                 # Fallback to deterministic summary when no OpenAI client
                 ai_summary = deterministic_result['structured_summary']
@@ -361,6 +364,87 @@ Instructions:
     )
     
     return response.choices[0].message.content
+
+async def rewrite_summary_to_strategic_briefing(original_summary_text: str, openai_client) -> str:
+    """
+    Takes a structured summary and rewrites it section by section into a cohesive strategic briefing.
+
+    Args:
+        original_summary_text: The full text of the original, structured summary.
+        openai_client: An initialized async OpenAI client.
+
+    Returns:
+        A single string containing the rewritten, cohesive strategic briefing.
+    """
+
+    # --- Step 1: Divide the document into sections ---
+    # We use regex to split the text at each numbered heading (e.g., "1. ", "2. ").
+    # The (?=...) is a positive lookahead to keep the delimiter in the split parts.
+    sections = re.split(r'\n(?=\d+\.\s)', original_summary_text)
+
+    # The first part is the intro, which we'll discard and replace. The rest are the sections to rewrite.
+    # We filter out any empty strings that might result from the split.
+    sections_to_rewrite = [s.strip() for s in sections[1:] if s.strip()]
+
+    # --- Step 2: Create a rewrite task for each section ---
+    tasks = []
+    for section_text in sections_to_rewrite:
+        tasks.append(_rewrite_section_strategically(section_text, openai_client))
+
+    # --- Step 3: Execute all rewrite tasks in parallel ---
+    rewritten_sections = await asyncio.gather(*tasks)
+
+    # --- Step 4: Assemble the final strategic briefing ---
+    # Frame the rewritten content with a new, authoritative introduction.
+    strategic_introduction = "This briefing outlines the strategic framework of the agreement, focusing on key areas of performance, risk, and operational control."
+    
+    # Join the high-quality rewritten sections together.
+    final_body = "\n\n".join(rewritten_sections)
+
+    return f"{strategic_introduction}\n\n{final_body}"
+
+
+async def _rewrite_section_strategically(section_text: str, openai_client) -> str:
+    """
+    Worker function to rewrite a single section of text into a strategic tone.
+    """
+    prompt = f"""You are rewriting a single section of a legal summary for an executive briefing. 
+Your task is to transform the following section into a concise, strategic paragraph.
+
+**Original Section to Rewrite:**
+---
+{section_text}
+---
+
+**Your Instructions:**
+1.  **Synthesize, Don't List:** Transform the list of claims into a flowing paragraph or a very tight, strategic bulleted list.
+2.  **Focus on Business Implications:** Reframe the points to highlight their purpose (e.g., "To ensure performance," "To maintain financial control," "To define clear terms").
+3.  **Discard the Old Header:** Do not include the original numbered header (e.g., "1. Obligation Claims"). The new text must stand on its own.
+4.  **Maintain All Citations:** Preserve every citation (e.g., [p1.para2.s3]) exactly as it appears, attached to its corresponding point.
+5.  **Use an Authoritative Tone:** The language should be confident, clear, and professional.
+
+Rewrite the section now.
+"""
+    try:
+        response = await openai_client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {
+                    "role": "system",
+                    "content": "You are a top-tier strategy consultant who excels at turning dense information into clear, actionable executive insights. Your tone is authoritative and precise."
+                },
+                {
+                    "role": "user",
+                    "content": prompt
+                }
+            ],
+            max_tokens=500,
+            temperature=0.2,
+        )
+        return response.choices[0].message.content.strip()
+    except Exception as e:
+        print(f"Failed to rewrite section: {e}")
+        return f"[Rewrite failed for section: {section_text[:50]}...]"
 
 async def resolve_citation(pdf_id: str, citation: str) -> dict:
     """

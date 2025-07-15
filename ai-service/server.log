@@ -1368,3 +1368,95 @@ INFO:     127.0.0.1:54706 - "POST /resolve-citation HTTP/1.1" 200 OK
 INFO:     127.0.0.1:54706 - "POST /resolve-citation HTTP/1.1" 200 OK
 INFO:     127.0.0.1:54706 - "POST /resolve-citation HTTP/1.1" 200 OK
 INFO:     127.0.0.1:54706 - "POST /resolve-citation HTTP/1.1" 200 OK
+WARNING:  WatchFiles detected changes in 'services.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [21059]
+Python(39731) MallocStackLogging: can't turn off malloc stack logging because it was not enabled.
+INFO:     Started server process [39731]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'services.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [39731]
+Python(39735) MallocStackLogging: can't turn off malloc stack logging because it was not enabled.
+INFO:     Started server process [39735]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+🔍 spaCy not available, using lightweight analysis
+INFO:     127.0.0.1:55083 - "OPTIONS /assistant-message HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55083 - "POST /assistant-message HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55090 - "OPTIONS /ingest-pdf HTTP/1.1" 200 OK
+/Users/jordannakamoto/start/ai-service/pocketflow.py:7: UserWarning: Overwriting successor for action 'default'
+  if action in self.successors: warnings.warn(f"Overwriting successor for action '{action}'")
+🔍 DEBUG: Received 1 pages
+🔍 DEBUG: Total characters: 31201
+🔍 DEBUG: Page 1: 31201 characters
+🔍 DEBUG: Page 1 preview: Sample ContractContract No.___________PROFESSIONAL SERVICES AGREEMENTTHIS AGREEMENT made and entered...
+INFO:     127.0.0.1:55090 - "POST /ingest-pdf HTTP/1.1" 200 OK
+🔍 Starting deterministic analysis of 50 segments
+🔍 Deterministic Analysis: 122 claims, 19 entities
+🔍 Claim types: obligation, prohibition, permission, conditional, definition, statement
+INFO:     127.0.0.1:55090 - "POST /assistant-message HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55090 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55090 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55090 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55090 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55090 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55090 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55090 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55090 - "POST /resolve-citation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55090 - "POST /resolve-citation HTTP/1.1" 200 OK
+WARNING:  WatchFiles detected changes in 'services.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [39735]
+Python(39839) MallocStackLogging: can't turn off malloc stack logging because it was not enabled.
+WARNING:  WatchFiles detected changes in 'services.py'. Reloading...
+INFO:     Started server process [39839]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+Python(39842) MallocStackLogging: can't turn off malloc stack logging because it was not enabled.
+INFO:     Started server process [39842]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'services.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [39842]
+Python(40026) MallocStackLogging: can't turn off malloc stack logging because it was not enabled.
+INFO:     Started server process [40026]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'services.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [40026]
+Python(40126) MallocStackLogging: can't turn off malloc stack logging because it was not enabled.
+INFO:     Started server process [40126]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'services.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [40126]
+Python(40172) MallocStackLogging: can't turn off malloc stack logging because it was not enabled.
+INFO:     Started server process [40172]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'services.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [40172]
+Python(40223) MallocStackLogging: can't turn off malloc stack logging because it was not enabled.
+INFO:     Started server process [40223]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
